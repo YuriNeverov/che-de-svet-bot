@@ -1,15 +1,16 @@
 import sys
-import os
 import unittest
 
-project_root = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, project_root)
+from pathlib import Path
+
+project_root = Path(__file__).parent.absolute()
+sys.path.insert(0, project_root.as_posix())
 
 if __name__ == '__main__':
   loader = unittest.TestLoader()
-  suite = loader.discover(start_dir=os.path.join(project_root, 'test'),
+  suite = loader.discover(start_dir=(project_root / 'test').as_posix(),
                           pattern='*Test.py',
-                          top_level_dir=project_root)
+                          top_level_dir=project_root.as_posix())
 
   print("\nRunning tests...")
   runner = unittest.TextTestRunner(verbosity=2)

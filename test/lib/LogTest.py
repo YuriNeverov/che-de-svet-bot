@@ -1,14 +1,10 @@
-import sys
-import os
 import tempfile
 import shutil
-
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 import unittest
 import logging
 from typing import Any
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from lib.Log import Log
@@ -43,8 +39,8 @@ class TestLog(unittest.TestCase):
 
 class TestLogFileHandler(unittest.TestCase):
   def setUp(self):
-    self.temp_dir = tempfile.mkdtemp(prefix='logtest_')
-    self.log_file = os.path.join(self.temp_dir, 'test.log')
+    self.temp_dir = Path(tempfile.mkdtemp(prefix='logtest_'))
+    self.log_file = self.temp_dir / 'test.log'
 
   def tearDown(self):
     # Close all handlers to release file handles
@@ -54,7 +50,7 @@ class TestLogFileHandler(unittest.TestCase):
     shutil.rmtree(self.temp_dir)
 
   def test_file_logging(self):
-    log = Log('test', log_file=self.log_file)
+    log = Log('test', log_file=self.log_file.as_posix())
 
     test_message = "Test file logging"
     log.info(test_message)
