@@ -50,30 +50,29 @@ class System:
       raise
 
   def register_user(self, user: User):
-    self.log.info(f"User {user.id},{user.identifier} check")
-    maybe_user = get_user(self.conn, user.id)
-    if maybe_user:
-      self.log.info(f"User {maybe_user.identifier} already registered")
-      return
-    insert_user(self.conn, user)
-    self.log.info(f"User {user.identifier} is being registered")
+    self.log.debug(f"User {user.id},{user.identifier} check")
+
+    if maybe_user := get_user(self.conn, user.id):
+      update_user(self.conn, user)
+      self.log.debug(f"User {maybe_user.identifier} was already registered")
+    else:
+      insert_user(self.conn, user)
+      self.log.debug(f"User {user.identifier} registered")
+
+    if not get_user_scenario(self.conn, user.id):
+      insert_user_scenario(self.conn, UserScenario(user.id, 0, "{}"))
 
   async def on_command(self, command: str, user: User, msg: Message):
     self.register_user(user)
     if command == "/help":
-      await self.actor.reply_to(msg, "Help message")
+      vars = self.config.read_vars()
+      await self.actor.reply_to(msg, self.config.read_help_msg(vars))
       self.log.info(f"Sent help message to {msg.chat_id}")
     elif command == "/start":
-      await self.actor.reply_to(msg, "Started dialog, timed 3 replies")
+      vars = self.config.read_vars()
+      vars["username"] = user.prettyName()
+      await self.actor.reply_to(msg, self.config.read_start_msg(vars))
       self.log.info(f"Started dialog with {msg.chat_id}, replying to {msg.id}")
-      self.timer_registry.new(
-          "Test", 3, 2, lambda: self.actor.send_panel_s(
-              msg.chat_id, "Вы готовы?",
-              Panel([[
-                  Button("Да", lambda: self.log.info("User clicked Да")),
-                  Button("Нет", lambda: self.log.info("User clicked Нет"))
-              ], [Button("Я не знаю", lambda: self.log.info("User не знает"))]]
-                    )))
     else:
       await self.actor.reply_to(msg, "Unknown command", reply=False)
       self.log.info(f"Unknown command from chat {msg.chat_id}: '{command}'")

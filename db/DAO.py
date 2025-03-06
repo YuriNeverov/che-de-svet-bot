@@ -2,7 +2,8 @@ from typing import Optional
 from sqlite3 import Connection
 from .Domain import (User, Operator, Subscription, Product,
                      ProductSubscription, ProductUserDelivered,
-                     UserSubscription, Schedule, MessageToOperator, Message)
+                     UserSubscription, Schedule, MessageToOperator, Message,
+                     UserScenario)
 
 
 def get_user(conn: Connection, user_id: int) -> Optional[User]:
@@ -11,13 +12,14 @@ def get_user(conn: Connection, user_id: int) -> Optional[User]:
   row = cursor.fetchone()
   if row is None:
     return None
-  return User(row[0], row[1])
+  return User(row[0], row[1], row[2], row[3])
 
 
 def insert_user(conn: Connection, user: User) -> Optional[int]:
   cursor = conn.cursor()
-  cursor.execute("insert into users (id, identifier) values (?, ?)",
-                 (user.id, user.identifier))
+  cursor.execute(
+      "insert into users (id, identifier, first_name, last_name) values (?, ?, ?, ?)",
+      (user.id, user.identifier, user.first_name, user.last_name))
   conn.commit()
   if cursor.lastrowid is None:
     return None
@@ -26,8 +28,9 @@ def insert_user(conn: Connection, user: User) -> Optional[int]:
 
 def update_user(conn: Connection, user: User):
   cursor = conn.cursor()
-  cursor.execute("update users set identifier=? where id=?",
-                 (user.identifier, user.id))
+  cursor.execute(
+      "update users set identifier=?, first_name=?, last_name=? where id=?",
+      (user.identifier, user.first_name, user.last_name, user.id))
   conn.commit()
 
 
@@ -297,4 +300,32 @@ def update_message(conn: Connection, message: Message):
       "update messages set sender_user_id=?, msg_text=?, msg_resource_path=?, sent_datetime=?, reply_to=? where chat_id=? and id=?",
       (message.sender_user_id, message.msg_text, message.msg_resource_path,
        message.sent_datetime, message.reply_to, message.chat_id, message.id))
+  conn.commit()
+
+
+def get_user_scenario(conn: Connection,
+                      user_id: int) -> Optional[UserScenario]:
+  cursor = conn.cursor()
+  cursor.execute("select * from user_scenarios where user_id=?", (user_id, ))
+  row = cursor.fetchone()
+  if row is None:
+    return None
+  return UserScenario(row[0], row[1], row[2])
+
+
+def insert_user_scenario(conn: Connection,
+                         user_scenario: UserScenario) -> Optional[int]:
+  cursor = conn.cursor()
+  cursor.execute(
+      "insert into user_scenarios (user_id, scenario_id, state) values (?, ?, ?)",
+      (user_scenario.user_id, user_scenario.scenario_id, user_scenario.state))
+  conn.commit()
+  return cursor.lastrowid
+
+
+def update_user_scenario(conn: Connection, user_scenario: UserScenario):
+  cursor = conn.cursor()
+  cursor.execute(
+      "update user_scenarios set state=?, scenario_id=? where user_id=?",
+      (user_scenario.state, user_scenario.scenario_id, user_scenario.user_id))
   conn.commit()

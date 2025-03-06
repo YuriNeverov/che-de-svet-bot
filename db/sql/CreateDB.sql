@@ -2,7 +2,9 @@
 
 create table if not exists users (
   id integer primary key,
-  identifier text
+  identifier text,
+  first_name text not null,
+  last_name text
 );
 
 create unique index if not exists users_identifier_idx on users (identifier);

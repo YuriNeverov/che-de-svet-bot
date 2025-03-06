@@ -3,9 +3,17 @@ from datetime import datetime
 
 
 class User:
-  def __init__(self, id: int, identifier: Optional[str]):
+  def __init__(self, id: int, identifier: Optional[str], first_name: str,
+               last_name: Optional[str]):
     self.id = id
     self.identifier = identifier
+    self.first_name = first_name
+    self.last_name = last_name
+
+  def prettyName(self) -> str:
+    if not self.last_name:
+      return self.first_name
+    return f"{self.first_name} {self.last_name}"
 
 
 class Operator:
@@ -82,3 +90,10 @@ class Message:
     self.msg_resource_path = msg_resource_path
     self.sent_datetime = sent_datetime
     self.reply_to = reply_to
+
+
+class UserScenario:
+  def __init__(self, user_id: int, scenario_id: int, state: str):
+    self.user_id = user_id
+    self.scenario_id = scenario_id
+    self.state = state

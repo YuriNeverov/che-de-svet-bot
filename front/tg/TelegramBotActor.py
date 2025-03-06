@@ -35,7 +35,10 @@ class TelegramBotActor(ActorInterface):
 
         await self.bot.set_my_commands([
             BotCommand("start", "Start the bot"),
-            BotCommand("help", "Get help")
+            BotCommand("help", "Get help message"),
+            BotCommand("message", "Send next message to the operator"),
+            BotCommand("schedule", "Schedule next bot interaction"),
+            BotCommand("subscribe", "Purchase a subscription"),
         ])
 
         self.system.register_user(to_domain_user(self.info))

@@ -10,4 +10,4 @@ def to_domain_message(msg: tg.Message) -> Message:
 
 
 def to_domain_user(user: tg.User) -> User:
-  return User(user.id, user.username)
+  return User(user.id, user.username, user.first_name, user.last_name)
