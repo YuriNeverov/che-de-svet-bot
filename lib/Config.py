@@ -5,7 +5,8 @@ class Config:
   def __init__(self, root_path: Path):
     self.root_path = root_path
     self.db_path = self.root_path / "res" / "state.db"
-    self.token_path = self.root_path / "conf" / "bot_token.conf"
+    self.token_path = self.root_path / "conf" / "bot_token.txt"
+    self.logs_path = self.root_path / "logs"
 
   def read_token(self):
     try:
