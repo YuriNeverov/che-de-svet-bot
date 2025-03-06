@@ -1,38 +1,39 @@
 import logging
-from typing import Optional, TextIO
+from typing import Optional
 
 
 class Log:
-  def __init__(self, name: str, stream: Optional[TextIO] = None):
-    self.logger = logging.getLogger(name)
-    self.logger.setLevel(logging.DEBUG)
+  def __init__(self, name: str, log_file: Optional[str] = None):
+    self.__logger = logging.getLogger(name)
+    self.__logger.setLevel(logging.DEBUG)
 
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     console_handler.setFormatter(formatter)
-    self.logger.addHandler(console_handler)
+    self.__logger.addHandler(console_handler)
 
-    self.stream = stream
+    if log_file:
+      file_handler = logging.FileHandler(log_file)
+      file_handler.setLevel(logging.DEBUG)
+      file_handler.setFormatter(formatter)
+      self.__logger.addHandler(file_handler)
 
   def log(self, level: int, msg: str):
-    if self.stream is None:
-      self.logger.log(level, msg)
-    else:
-      self.stream.write(f'{msg}\n')
+    self.__logger.log(level, msg)
 
   def debug(self, msg: str):
-    self.log(logging.DEBUG, msg)
+    self.__logger.log(logging.DEBUG, msg)
 
   def info(self, msg: str):
-    self.log(logging.INFO, msg)
+    self.__logger.log(logging.INFO, msg)
 
   def warning(self, msg: str):
-    self.log(logging.WARNING, msg)
+    self.__logger.log(logging.WARN, msg)
 
   def error(self, msg: str):
-    self.log(logging.ERROR, msg)
+    self.__logger.log(logging.ERROR, msg)
 
   def critical(self, msg: str):
-    self.log(logging.CRITICAL, msg)
+    self.__logger.log(logging.CRITICAL, msg)

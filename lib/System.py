@@ -14,8 +14,16 @@ class System:
     self.actor = actor
     # TODO: Make thread-safe
     self.timer_registry = TimerRegistry()
-    self.log = Log("System")
+    
+    config.logs_path.mkdir(exist_ok=True)
+    
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_file = config.logs_path / f"system_{timestamp}.log"
+    
+    self.log = Log("System", log_file=str(log_file))
     try:
+      self.config.db_path.parent.mkdir(exist_ok=True)
       self.conn = sqlite3.connect(config.db_path)
       self.conn.execute("PRAGMA foreign_keys = ON;")
 
