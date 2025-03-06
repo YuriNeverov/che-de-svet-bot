@@ -4,6 +4,7 @@ from .ActorInterface import ActorInterface
 from .Config import Config
 from .Timer import TimerRegistry
 from .Log import Log
+from .Domain import *
 from db.DAO import *
 from db.Domain import *
 
@@ -14,13 +15,13 @@ class System:
     self.actor = actor
     # TODO: Make thread-safe
     self.timer_registry = TimerRegistry()
-    
+
     config.logs_path.mkdir(exist_ok=True)
-    
+
     from datetime import datetime
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     log_file = config.logs_path / f"system_{timestamp}.log"
-    
+
     self.log = Log("System", log_file=str(log_file))
     try:
       self.config.db_path.parent.mkdir(exist_ok=True)
@@ -65,8 +66,14 @@ class System:
     elif command == "/start":
       await self.actor.reply_to(msg, "Started dialog, timed 3 replies")
       self.log.info(f"Started dialog with {msg.chat_id}, replying to {msg.id}")
-      self.timer_registry.new("Test", 3, 2,
-                              lambda: self.actor.reply_to_s(msg, "Timed msg"))
+      self.timer_registry.new(
+          "Test", 3, 2, lambda: self.actor.send_panel_s(
+              msg.chat_id, "Вы готовы?",
+              Panel([[
+                  Button("Да", lambda: self.log.info("User clicked Да")),
+                  Button("Нет", lambda: self.log.info("User clicked Нет"))
+              ], [Button("Я не знаю", lambda: self.log.info("User не знает"))]]
+                    )))
     else:
       await self.actor.reply_to(msg, "Unknown command", reply=False)
       self.log.info(f"Unknown command from chat {msg.chat_id}: '{command}'")

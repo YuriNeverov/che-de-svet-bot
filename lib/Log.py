@@ -1,4 +1,5 @@
 import logging
+import sys
 from typing import Optional
 
 
@@ -7,7 +8,7 @@ class Log:
     self.__logger = logging.getLogger(name)
     self.__logger.setLevel(logging.DEBUG)
 
-    console_handler = logging.StreamHandler()
+    console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -15,7 +16,7 @@ class Log:
     self.__logger.addHandler(console_handler)
 
     if log_file:
-      file_handler = logging.FileHandler(log_file)
+      file_handler = logging.FileHandler(log_file, encoding='utf-8')
       file_handler.setLevel(logging.DEBUG)
       file_handler.setFormatter(formatter)
       self.__logger.addHandler(file_handler)

@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-from db.Domain import *
+from lib.Domain import Panel
+from db.Domain import Message
 
 if TYPE_CHECKING:
   from .System import System
@@ -31,11 +32,21 @@ class ActorInterface(ABC):
     pass
 
   @abstractmethod
+  async def send_panel(self, chat_id: int, text: str,
+                       panel: Panel) -> Optional[int]:
+    pass
+
+  @abstractmethod
   def send_message_s(self, msg: Message) -> None:
     pass
 
   @abstractmethod
   def reply_to_s(self, msg: Message, text: str, reply: bool = True) -> None:
+    pass
+
+  @abstractmethod
+  def send_panel_s(self, chat_id: int, text: str,
+                   panel: Panel) -> Optional[int]:
     pass
 
   @abstractmethod

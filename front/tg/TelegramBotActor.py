@@ -1,14 +1,17 @@
 import asyncio
 from datetime import datetime
-from typing import Any, Coroutine, Optional
+from typing import Any, Coroutine, Optional, TypeVar
 from telegram import Bot, BotCommand, Update, User
-from telegram.ext import Application, MessageHandler, filters
+from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler
 
 from db.Domain import Message
 from lib.ActorInterface import ActorInterface
 from lib.System import System
+from lib.Domain import Panel
 
-from .DomainAdapter import to_domain_message, to_domain_user
+from front.tg.DomainAdapter import to_domain_message, to_domain_user
+
+T = TypeVar("T")
 
 
 class TelegramBotActor(ActorInterface):
@@ -18,6 +21,7 @@ class TelegramBotActor(ActorInterface):
     self.info: User
     self.event_loop: asyncio.AbstractEventLoop
     self.app: Application[Any, Any, Any, Any, Any, Any]
+    self.active_panels: dict[str, Panel] = {}
 
   def set_up(self, system: System) -> None:
     self.system = system
@@ -63,8 +67,29 @@ class TelegramBotActor(ActorInterface):
       except Exception as e:
         self.system.log.error(f"Message handler failed: {e}")
 
-    self.app.add_handler(MessageHandler(filters.COMMAND,
-                                        handler))  #type: ignore
+    self.app.add_handler(MessageHandler(filters.COMMAND, handler))
+
+    async def button_handler(update: Update, context: Any):
+      try:
+        query = update.callback_query
+        if not query or not query.data:
+          return
+
+        callback_data = query.data
+        if callback_data in self.active_panels:
+          panel = self.active_panels[callback_data]
+          for row in panel.buttons:
+            for btn in row:
+              if btn.callback_data == callback_data:
+                if btn.on_click:
+                  btn.on_click()
+                break
+
+        await query.answer()
+      except Exception as e:
+        self.system.log.error(f"Button handler failed: {e}")
+
+    self.app.add_handler(CallbackQueryHandler(button_handler))
 
   def run(self) -> None:
     self.app.run_polling()
@@ -83,6 +108,30 @@ class TelegramBotActor(ActorInterface):
       return actual_msg.id
     except Exception as e:
       self.system.log.error(f"Failed to send message to {msg.chat_id}: {e}")
+      return None
+
+  async def send_panel(self, chat_id: int, text: str,
+                       panel: Panel) -> Optional[int]:
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+    try:
+      keyboard = [[
+          InlineKeyboardButton(btn.text, callback_data=btn.callback_data)
+          for btn in row
+      ] for row in panel.buttons]
+
+      for row in panel.buttons:
+        for btn in row:
+          self.active_panels[btn.callback_data] = panel
+
+      message = await self.bot.send_message(
+          chat_id=chat_id,
+          text=text,
+          reply_markup=InlineKeyboardMarkup(keyboard))
+
+      return message.message_id
+    except Exception as e:
+      self.system.log.error(f"Failed to send panel to {chat_id}: {e}")
       return None
 
   async def reply_to(self,
@@ -105,7 +154,11 @@ class TelegramBotActor(ActorInterface):
   def reply_to_s(self, msg: Message, text: str, reply: bool = True) -> None:
     self.do_sync(self.reply_to(msg, text, reply))
 
-  def do_sync(self, coro: Coroutine[Any, Any, Any]) -> Optional[Any]:
+  def send_panel_s(self, chat_id: int, text: str,
+                   panel: "Panel") -> Optional[int]:
+    return self.do_sync(self.send_panel(chat_id, text, panel))
+
+  def do_sync(self, coro: Coroutine[Any, Any, T]) -> Optional[T]:
     try:
       future = asyncio.run_coroutine_threadsafe(coro, self.event_loop)
       return future.result()
