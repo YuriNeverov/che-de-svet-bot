@@ -1,5 +1,7 @@
 import sys
 import os
+import tempfile
+import shutil
 
 sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
@@ -20,10 +22,7 @@ class TestLog(unittest.TestCase):
 
     log = Log('test')
 
-    self.assertEqual(log.logger, mock_log)
-    self.assertIsNone(log.stream)
-
-    log.logger.log(logging.INFO, 'test message')
+    log.log(logging.INFO, 'test message')
     mock_log.log.assert_called_once_with(logging.INFO, 'test message')
 
     log.debug('debug message')
@@ -41,29 +40,28 @@ class TestLog(unittest.TestCase):
     log.critical('critical message')
     mock_log.log.assert_called_with(logging.CRITICAL, 'critical message')
 
-    mock_stream = MagicMock()
-    log = Log('test', mock_stream)
 
-    self.assertEqual(log.logger, mock_log)
-    self.assertEqual(log.stream, mock_stream)
+class TestLogFileHandler(unittest.TestCase):
+  def setUp(self):
+    self.temp_dir = tempfile.mkdtemp(prefix='logtest_')
+    self.log_file = os.path.join(self.temp_dir, 'test.log')
 
-    log.log(logging.INFO, 'test message')
-    mock_stream.write.assert_called_once_with('test message\n')
+  def tearDown(self):
+    # Close all handlers to release file handles
+    for handler in logging.getLogger('test').handlers:
+      handler.close()
+    # Remove temp directory
+    shutil.rmtree(self.temp_dir)
 
-    log.debug('debug message')
-    mock_stream.write.assert_called_with('debug message\n')
+  def test_file_logging(self):
+    log = Log('test', log_file=self.log_file)
 
-    log.info('info message')
-    mock_stream.write.assert_called_with('info message\n')
+    test_message = "Test file logging"
+    log.info(test_message)
 
-    log.warning('warning message')
-    mock_stream.write.assert_called_with('warning message\n')
-
-    log.error('error message')
-    mock_stream.write.assert_called_with('error message\n')
-
-    log.critical('critical message')
-    mock_stream.write.assert_called_with('critical message\n')
+    with open(self.log_file, 'r') as f:
+      content = f.read()
+      self.assertIn(test_message, content)
 
 
 if __name__ == '__main__':

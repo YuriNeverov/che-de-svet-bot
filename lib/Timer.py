@@ -4,8 +4,10 @@ from typing import Callable, Any, Dict, List
 
 
 class Timer:
-  def __init__(self, name: str, times: int, duration: float,
-               func: Callable[..., Any], *args: Any, **kwargs: Any):
+  def __init__(self, registry: "TimerRegistry", name: str, times: int,
+               duration: float, func: Callable[..., Any], *args: Any,
+               **kwargs: Any):
+    self.registry = registry
     self.name = name
     self.times = times
     self.duration = duration
@@ -20,7 +22,8 @@ class Timer:
 
   def stop(self):
     self._stop_event.set()
-    self._thread.join()
+    if threading.current_thread() is not self._thread:
+      self._thread.join()
 
   def _run(self):
     count = 0
@@ -33,6 +36,7 @@ class Timer:
       count += 1
       # TODO: Make true duration sleep (now it doesn't count time of self.func execution)
       time.sleep(self.duration)
+    self.registry.delete(self.name)
 
 
 class TimerRegistry:
@@ -43,7 +47,7 @@ class TimerRegistry:
           func: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
     if name in self._timers:
       return
-    timer = Timer(name, times, duration, func, *args, **kwargs)
+    timer = Timer(self, name, times, duration, func, *args, **kwargs)
     self._timers[name] = timer
     timer.start()
 
