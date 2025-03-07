@@ -74,6 +74,10 @@ class System:
 
     self.register_user(self.actor.get_self_user())
 
+  async def on_message(self, user: User, msg: Message):
+    self.register_user(user)
+    self.log.debug(f"Received message from {msg.chat_id}: '{msg.msg_text}'")
+
   async def on_command(self, command: str, user: User, msg: Message):
     self.register_user(user)
     if command == "/help":
@@ -92,6 +96,7 @@ class System:
   def run(self):
     self.actor.set_up(log=self.log,
                       on_command=self.on_command,
+                      on_message=self.on_message,
                       on_init=self.on_init)
     self.actor.run()
 

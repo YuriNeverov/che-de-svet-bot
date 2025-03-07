@@ -29,11 +29,42 @@ class TelegramBotActor(ActorInterface):
       log: Log,
       on_command: Callable[[str, DomainUser, Message], Coroutine[Any, Any,
                                                                  None]],
+      on_message: Callable[[DomainUser, Message], Coroutine[Any, Any, None]],
       on_init: Optional[Callable[[], Coroutine[Any, Any,
                                                None]]] = None) -> None:
     self.log = log
 
-    async def fetch_bot_info(
+    async def handle_message(update: Update,
+                             handler: Callable[..., Coroutine[Any, Any, None]],
+                             isCommand: bool) -> None:
+      try:
+        if not update.message or not update.message.text or not update.message.from_user:
+          return
+
+        user = to_domain_user(update.message.from_user)
+        message = to_domain_message(update.message)
+
+        try:
+          if isCommand:
+            args = update.message.text.split()
+            command = args[0] if args else update.message.text
+            await handler(command, user, message)
+          else:
+            await handler(user, message)
+
+        except Exception as e:
+          if self.log:
+            self.log.error(f"Message handler failed: {e}")
+          await self.reply_to(
+              message,
+              "An error occurred while processing your message",
+              reply=True)
+
+      except Exception as e:
+        if self.log:
+          self.log.error(f"Message handler failed: {e}")
+
+    async def post_init(
         app: "Application[Bot, Any, Any, Any, Any, Any]") -> None:
       try:
         self.bot = app.bot
@@ -47,32 +78,16 @@ class TelegramBotActor(ActorInterface):
         raise
 
     self.app = Application.builder().token(
-        self.token).post_init(fetch_bot_info).build()  # type: ignore
+        self.token).post_init(post_init).build()  # type: ignore
 
-    async def handler(update: Update, context: Any):
-      try:
-        if not update.message or not update.message.text or not update.message.from_user:
-          return
-
-        command = update.message.text.split()[0]
-        user = to_domain_user(update.message.from_user)
-        message = to_domain_message(update.message)
-
-        try:
-          await on_command(command, user, message)
-        except Exception as e:
-          if self.log:
-            self.log.error(f"Command handler failed for {command}: {e}")
-          await self.reply_to(
-              message,
-              "An error occurred while processing your request",
-              reply=True)
-
-      except Exception as e:
-        if self.log:
-          self.log.error(f"Message handler failed: {e}")
-
-    self.app.add_handler(MessageHandler(filters.COMMAND, handler))
+    self.app.add_handler(
+        MessageHandler(
+            filters.COMMAND, lambda update, _: handle_message(
+                update, on_command, isCommand=True)))
+    self.app.add_handler(
+        MessageHandler(
+            ~filters.COMMAND, lambda update, _: handle_message(
+                update, on_message, isCommand=False)))
 
     async def button_handler(update: Update, context: Any):
       try:

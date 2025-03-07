@@ -15,6 +15,7 @@ class ActorInterface(ABC):
       self,
       log: Log,
       on_command: Callable[[str, User, Message], Coroutine[Any, Any, None]],
+      on_message: Callable[[User, Message], Coroutine[Any, Any, None]],
       on_init: Optional[Callable[[], Coroutine[Any, Any,
                                                None]]] = None) -> None:
     pass
