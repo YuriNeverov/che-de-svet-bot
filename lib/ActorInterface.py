@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Optional
 
-from lib.Domain import Panel
+from lib.Domain import Panel, Quiz
 from db.Domain import Message
 
 if TYPE_CHECKING:
@@ -37,6 +37,10 @@ class ActorInterface(ABC):
     pass
 
   @abstractmethod
+  async def send_quiz(self, chat_id: int, quiz: Quiz) -> Optional[int]:
+    pass
+
+  @abstractmethod
   def send_message_s(self, msg: Message) -> None:
     pass
 
@@ -47,6 +51,10 @@ class ActorInterface(ABC):
   @abstractmethod
   def send_panel_s(self, chat_id: int, text: str,
                    panel: Panel) -> Optional[int]:
+    pass
+
+  @abstractmethod
+  def send_quiz_s(self, chat_id: int, quiz: Quiz) -> Optional[int]:
     pass
 
   @abstractmethod

@@ -6,8 +6,18 @@ State DB shall be in `res/state.db`.
 
 Resourses should be placed in `res/products`.
 
-`pip install python-telegram-bot` is required.
+### Install
+```sh
+pip3 install python-telegram-bot pyyaml types-PyYAML
+python3 setup.py
+```
 
-Script should be invoked as `python3 main.py` from root of this repository.
+### Run
+```sh
+python3 main.py
+```
 
-Tests should be invoked as `python3 test/$PATH_TO_TEST/$TEST_NAME.py`.
+### Test
+```sh
+python3 test.py
+```

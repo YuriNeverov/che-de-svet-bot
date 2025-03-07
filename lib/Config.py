@@ -36,7 +36,7 @@ class Config:
   def read_vars(self) -> Dict[str, Any]:
     if not self.vars_path.exists(): return {}
     try:
-      with open(self.vars_path, 'r') as f:
+      with open(self.vars_path, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f) or {}
     except Exception:
       return {}
@@ -44,7 +44,7 @@ class Config:
   def read_msg_from_file(self, path: Path, vars: Dict[str, Any]) -> str:
     if not path.exists(): return ""
     try:
-      with open(path, 'r') as f:
+      with open(path, 'r', encoding='utf-8') as f:
         return self.substitute_vars(f.read().strip(), vars)
     except Exception:
       return ""

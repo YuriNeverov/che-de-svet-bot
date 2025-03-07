@@ -32,3 +32,14 @@ class Panel:
 
   def __repr__(self):
     return f"Panel(buttons={self.buttons})"
+
+
+class Quiz:
+  def __init__(self, question: str, options: List[str], correct_option: int):
+    self.question = question
+    self.options = options
+    self.callback_data = str(uuid.uuid4())
+    self.correct_option = correct_option
+
+  def __repr__(self):
+    return f"Quiz(question={self.question}, options={self.options}, correct_option={self.correct_option})"

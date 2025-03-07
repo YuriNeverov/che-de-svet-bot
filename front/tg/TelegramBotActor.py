@@ -7,7 +7,7 @@ from telegram.ext import Application, MessageHandler, filters, CallbackQueryHand
 from db.Domain import Message
 from lib.ActorInterface import ActorInterface
 from lib.System import System
-from lib.Domain import Panel
+from lib.Domain import Panel, Quiz
 
 from front.tg.DomainAdapter import to_domain_message, to_domain_user
 
@@ -151,6 +151,31 @@ class TelegramBotActor(ActorInterface):
     await self.send_message(reply_msg)
     return reply_msg
 
+  async def send_quiz(self, chat_id: int, quiz: Quiz) -> Optional[int]:
+    try:
+      if len(quiz.options) > 10:
+        raise ValueError("Telegram quizzes support maximum 10 options")
+      if quiz.correct_option < 0 or quiz.correct_option >= len(quiz.options):
+        raise ValueError("correct_option must be a valid index for options")
+      
+      from typing import cast
+      from telegram._utils.types import CorrectOptionID
+      
+      correct_option = cast(CorrectOptionID, quiz.correct_option)
+      
+      message = await self.bot.send_poll(
+          chat_id=chat_id,
+          question=quiz.question,
+          options=quiz.options,
+          type="quiz",
+          correct_option_id=correct_option,
+          is_anonymous=False
+      )
+      return message.message_id
+    except Exception as e:
+      self.system.log.error(f"Failed to send quiz to {chat_id}: {e}")
+      return None
+
   def send_message_s(self, msg: Message) -> None:
     self.do_sync(self.send_message(msg))
 
@@ -160,6 +185,9 @@ class TelegramBotActor(ActorInterface):
   def send_panel_s(self, chat_id: int, text: str,
                    panel: "Panel") -> Optional[int]:
     return self.do_sync(self.send_panel(chat_id, text, panel))
+
+  def send_quiz_s(self, chat_id: int, quiz: Quiz) -> Optional[int]:
+    return self.do_sync(self.send_quiz(chat_id, quiz))
 
   def do_sync(self, coro: Coroutine[Any, Any, T]) -> Optional[T]:
     try:

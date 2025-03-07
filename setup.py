@@ -26,13 +26,13 @@ start_message = """Добрый день, $username!
 """
 
 if not (conf / "vars.yaml").exists():
-  with open(conf / "vars.yaml", "w") as file:
+  with open(conf / "vars.yaml", "w", encoding='utf-8') as file:
     file.write(vars_yaml)
 
 if not (res / "help_message.txt").exists():
-  with open(res / "help_message.txt", "w") as file:
+  with open(res / "help_message.txt", "w", encoding='utf-8') as file:
     file.write(help_message)
 
 if not (res / "start_message.txt").exists():
-  with open(res / "start_message.txt", "w") as file:
+  with open(res / "start_message.txt", "w", encoding='utf-8') as file:
     file.write(start_message)
