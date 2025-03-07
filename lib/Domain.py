@@ -43,3 +43,21 @@ class Quiz:
 
   def __repr__(self):
     return f"Quiz(question={self.question}, options={self.options}, correct_option={self.correct_option})"
+
+
+class Command:
+  def __init__(self, command: str, desc: str):
+    self.command = command
+    self.desc = desc
+
+  def __repr__(self):
+    return f"Command(command={self.command}, desc={self.desc})"
+
+
+class CommandSet:
+  def __init__(self, set: List[Command], scope: Optional[List[int]] = None):
+    self.set = set
+    self.scope = scope
+
+  def __repr__(self):
+    return f"CommandSet(set={self.set}, scope={self.scope})"

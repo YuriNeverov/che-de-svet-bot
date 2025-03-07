@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 from sqlite3 import Connection
 from .Domain import (User, Operator, Subscription, Product,
                      ProductSubscription, ProductUserDelivered,
@@ -41,6 +41,16 @@ def get_operator(conn: Connection, operator_id: int) -> Optional[Operator]:
   if row is None:
     return None
   return Operator(row[0], row[1], row[2])
+
+
+def get_all_operators(conn: Connection) -> List[Operator]:
+  cursor = conn.cursor()
+  cursor.execute("select * from operators")
+  res: List[Operator] = []
+  rows = cursor.fetchall()
+  for row in rows:
+    res.append(Operator(row[0], row[1], row[2]))
+  return res
 
 
 def insert_operator(conn: Connection, operator: Operator) -> Optional[int]:

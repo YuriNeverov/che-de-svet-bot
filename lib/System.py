@@ -62,6 +62,18 @@ class System:
     if not get_user_scenario(self.conn, user.id):
       insert_user_scenario(self.conn, UserScenario(user.id, 0, "{}"))
 
+  async def on_init(self):
+    await self.actor.set_commands(
+        CommandSet([
+            Command("start", "Start the bot"),
+            Command("help", "Get help message"),
+            Command("message", "Send next message to the operator"),
+            Command("schedule", "Schedule next bot interaction"),
+            Command("subscribe", "Purchase a subscription"),
+        ]))
+
+    self.register_user(self.actor.get_self_user())
+
   async def on_command(self, command: str, user: User, msg: Message):
     self.register_user(user)
     if command == "/help":
@@ -78,7 +90,9 @@ class System:
       self.log.info(f"Unknown command from chat {msg.chat_id}: '{command}'")
 
   def run(self):
-    self.actor.set_up(self)
+    self.actor.set_up(log=self.log,
+                      on_command=self.on_command,
+                      on_init=self.on_init)
     self.actor.run()
 
   def __del__(self):

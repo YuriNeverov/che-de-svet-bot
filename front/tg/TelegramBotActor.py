@@ -1,13 +1,13 @@
 import asyncio
 from datetime import datetime
-from typing import Any, Coroutine, Optional, TypeVar
-from telegram import Bot, BotCommand, Update, User
+from typing import Any, Callable, Coroutine, Optional, TypeVar
+from telegram import Bot, BotCommand, BotCommandScopeChat, Update, User
 from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler
 
-from db.Domain import Message
+from db.Domain import Message, User as DomainUser
 from lib.ActorInterface import ActorInterface
-from lib.System import System
-from lib.Domain import Panel, Quiz
+from lib.Log import Log
+from lib.Domain import CommandSet, Panel, Quiz
 
 from front.tg.DomainAdapter import to_domain_message, to_domain_user
 
@@ -20,11 +20,18 @@ class TelegramBotActor(ActorInterface):
     self.bot: Bot
     self.info: User
     self.event_loop: asyncio.AbstractEventLoop
+    self.log: Optional[Log] = None
     self.app: Application[Any, Any, Any, Any, Any, Any]
     self.active_panels: dict[str, Panel] = {}
 
-  def set_up(self, system: System) -> None:
-    self.system = system
+  def set_up(
+      self,
+      log: Log,
+      on_command: Callable[[str, DomainUser, Message], Coroutine[Any, Any,
+                                                                 None]],
+      on_init: Optional[Callable[[], Coroutine[Any, Any,
+                                               None]]] = None) -> None:
+    self.log = log
 
     async def fetch_bot_info(
         app: "Application[Bot, Any, Any, Any, Any, Any]") -> None:
@@ -32,18 +39,11 @@ class TelegramBotActor(ActorInterface):
         self.bot = app.bot
         self.info = await self.bot.get_me()
         self.event_loop = asyncio.get_event_loop()
-
-        await self.bot.set_my_commands([
-            BotCommand("start", "Start the bot"),
-            BotCommand("help", "Get help message"),
-            BotCommand("message", "Send next message to the operator"),
-            BotCommand("schedule", "Schedule next bot interaction"),
-            BotCommand("subscribe", "Purchase a subscription"),
-        ])
-
-        self.system.register_user(to_domain_user(self.info))
+        if on_init:
+          await on_init()
       except Exception as e:
-        self.system.log.error(f"Failed to initialize bot: {e}")
+        if self.log:
+          self.log.error(f"Failed to initialize bot: {e}")
         raise
 
     self.app = Application.builder().token(
@@ -59,16 +59,18 @@ class TelegramBotActor(ActorInterface):
         message = to_domain_message(update.message)
 
         try:
-          await self.system.on_command(command, user, message)
+          await on_command(command, user, message)
         except Exception as e:
-          self.system.log.error(f"Command handler failed for {command}: {e}")
+          if self.log:
+            self.log.error(f"Command handler failed for {command}: {e}")
           await self.reply_to(
               message,
               "An error occurred while processing your request",
               reply=True)
 
       except Exception as e:
-        self.system.log.error(f"Message handler failed: {e}")
+        if self.log:
+          self.log.error(f"Message handler failed: {e}")
 
     self.app.add_handler(MessageHandler(filters.COMMAND, handler))
 
@@ -90,12 +92,23 @@ class TelegramBotActor(ActorInterface):
 
         await query.answer()
       except Exception as e:
-        self.system.log.error(f"Button handler failed: {e}")
+        if self.log:
+          self.log.error(f"Button handler failed: {e}")
 
     self.app.add_handler(CallbackQueryHandler(button_handler))
 
   def run(self) -> None:
     self.app.run_polling()
+
+  async def set_commands(self, command_set: CommandSet) -> None:
+    if command_set.scope:
+      for chat_id in command_set.scope:
+        await self.bot.set_my_commands(
+            [BotCommand(cmd.command, cmd.desc) for cmd in command_set.set],
+            scope=BotCommandScopeChat(chat_id=chat_id))
+      return
+    await self.bot.set_my_commands(
+        [BotCommand(cmd.command, cmd.desc) for cmd in command_set.set])
 
   async def send_message(self, msg: Message) -> Optional[int]:
     if not msg.msg_text:
@@ -110,7 +123,8 @@ class TelegramBotActor(ActorInterface):
       msg.id = actual_msg.id
       return actual_msg.id
     except Exception as e:
-      self.system.log.error(f"Failed to send message to {msg.chat_id}: {e}")
+      if self.log:
+        self.log.error(f"Failed to send message to {msg.chat_id}: {e}")
       return None
 
   async def send_panel(self, chat_id: int, text: str,
@@ -134,7 +148,8 @@ class TelegramBotActor(ActorInterface):
 
       return message.message_id
     except Exception as e:
-      self.system.log.error(f"Failed to send panel to {chat_id}: {e}")
+      if self.log:
+        self.log.error(f"Failed to send panel to {chat_id}: {e}")
       return None
 
   async def reply_to(self,
@@ -142,7 +157,7 @@ class TelegramBotActor(ActorInterface):
                      text: str,
                      reply: bool = True) -> Optional[Message]:
     reply_msg = Message(id=0,
-                        sender_user_id=self.get_own_id(),
+                        sender_user_id=self.get_self_user().id,
                         chat_id=msg.chat_id,
                         msg_text=text,
                         msg_resource_path="",
@@ -157,24 +172,26 @@ class TelegramBotActor(ActorInterface):
         raise ValueError("Telegram quizzes support maximum 10 options")
       if quiz.correct_option < 0 or quiz.correct_option >= len(quiz.options):
         raise ValueError("correct_option must be a valid index for options")
-      
+
       from typing import cast
       from telegram._utils.types import CorrectOptionID
-      
+
       correct_option = cast(CorrectOptionID, quiz.correct_option)
-      
-      message = await self.bot.send_poll(
-          chat_id=chat_id,
-          question=quiz.question,
-          options=quiz.options,
-          type="quiz",
-          correct_option_id=correct_option,
-          is_anonymous=False
-      )
+
+      message = await self.bot.send_poll(chat_id=chat_id,
+                                         question=quiz.question,
+                                         options=quiz.options,
+                                         type="quiz",
+                                         correct_option_id=correct_option,
+                                         is_anonymous=False)
       return message.message_id
     except Exception as e:
-      self.system.log.error(f"Failed to send quiz to {chat_id}: {e}")
+      if self.log:
+        self.log.error(f"Failed to send quiz to {chat_id}: {e}")
       return None
+
+  def set_commands_s(self, command_set: CommandSet) -> None:
+    self.do_sync(self.set_commands(command_set))
 
   def send_message_s(self, msg: Message) -> None:
     self.do_sync(self.send_message(msg))
@@ -194,8 +211,9 @@ class TelegramBotActor(ActorInterface):
       future = asyncio.run_coroutine_threadsafe(coro, self.event_loop)
       return future.result()
     except Exception as e:
-      self.system.log.error(f"Failed to execute synchronously: {e}")
+      if self.log:
+        self.log.error(f"Failed to execute synchronously: {e}")
       return None
 
-  def get_own_id(self) -> int:
-    return self.info.id
+  def get_self_user(self) -> DomainUser:
+    return to_domain_user(self.info)

@@ -1,11 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Optional
+from typing import Any, Callable, Coroutine, Optional
 
-from lib.Domain import Panel, Quiz
-from db.Domain import Message
-
-if TYPE_CHECKING:
-  from .System import System
+from lib.Domain import CommandSet, Panel, Quiz
+from lib.Log import Log
+from db.Domain import Message, User
 
 
 class ActorInterface(ABC):
@@ -13,11 +11,20 @@ class ActorInterface(ABC):
     pass
 
   @abstractmethod
-  def set_up(self, system: "System") -> None:
+  def set_up(
+      self,
+      log: Log,
+      on_command: Callable[[str, User, Message], Coroutine[Any, Any, None]],
+      on_init: Optional[Callable[[], Coroutine[Any, Any,
+                                               None]]] = None) -> None:
     pass
 
   @abstractmethod
   def run(self) -> None:
+    pass
+
+  @abstractmethod
+  async def set_commands(self, command_set: CommandSet) -> None:
     pass
 
   @abstractmethod
@@ -41,6 +48,10 @@ class ActorInterface(ABC):
     pass
 
   @abstractmethod
+  def set_commands_s(self, command_set: CommandSet) -> None:
+    pass
+
+  @abstractmethod
   def send_message_s(self, msg: Message) -> None:
     pass
 
@@ -58,5 +69,5 @@ class ActorInterface(ABC):
     pass
 
   @abstractmethod
-  def get_own_id(self) -> int:
+  def get_self_user(self) -> User:
     pass
