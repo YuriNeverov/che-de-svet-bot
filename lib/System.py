@@ -1,10 +1,18 @@
 import sqlite3
 
+from typing import Dict
+
 from .ActorInterface import ActorInterface
 from .Config import Config
 from .Timer import TimerRegistry
 from .Log import Log
 from .Domain import *
+from .scenarios.ScenarioExecutorInterface import ScenarioExecutorInterface
+from .scenarios.CheckReadyScenarioExecutor import CheckReadyScenarioExecutor
+from .scenarios.ScheduleScenarioExecutor import ScheduleScenarioExecutor
+from .scenarios.SendMessageScenarioExecutor import SendMessageScenarioExecutor
+from .scenarios.SubscribeScenarioExecutor import SubscribeScenarioExecutor
+
 from db.DAO import *
 from db.Domain import *
 
@@ -63,6 +71,22 @@ class System:
       insert_user_scenario(self.conn, UserScenario(user.id, 0, "{}"))
 
   async def on_init(self):
+    self.scenario_ids = {
+        "/message": 1,
+        "/schedule": 2,
+        "/subscribe": 3,
+        "check_ready": 4,  # not a command scenario, so no '/'
+    }
+    self.scenario_executors: Dict[int, ScenarioExecutorInterface] = {
+        self.scenario_ids["/message"]:
+        SendMessageScenarioExecutor(self.log, self.actor, self.conn),
+        self.scenario_ids["/schedule"]:
+        ScheduleScenarioExecutor(self.log, self.actor, self.conn),
+        self.scenario_ids["/subscribe"]:
+        SubscribeScenarioExecutor(self.log, self.actor, self.conn),
+        self.scenario_ids["check_ready"]:
+        CheckReadyScenarioExecutor(self.log, self.actor, self.conn),
+    }
     await self.actor.set_commands(
         CommandSet([
             Command("start", "Start the bot"),
@@ -80,18 +104,33 @@ class System:
 
   async def on_command(self, command: str, user: User, msg: Message):
     self.register_user(user)
+
     if command == "/help":
       vars = self.config.read_vars()
       await self.actor.reply_to(msg, self.config.read_help_msg(vars))
       self.log.info(f"Sent help message to {msg.chat_id}")
-    elif command == "/start":
+      return
+    if command == "/start":
       vars = self.config.read_vars()
       vars["username"] = user.prettyName()
       await self.actor.reply_to(msg, self.config.read_start_msg(vars))
       self.log.info(f"Started dialog with {msg.chat_id}, replying to {msg.id}")
-    else:
+      return
+
+    if command not in self.scenario_ids:
       await self.actor.reply_to(msg, "Unknown command", reply=False)
       self.log.info(f"Unknown command from chat {msg.chat_id}: '{command}'")
+      return
+
+    update_user_scenario(
+        self.conn, UserScenario(user.id, self.scenario_ids[command], "{}"))
+    await self.execute_scenario(user, msg)
+
+  async def execute_scenario(self, user: User, msg: Message):
+    scenario = get_user_scenario(self.conn, user.id)
+    if not scenario or scenario.scenario_id not in self.scenario_executors:
+      return
+    await self.scenario_executors[scenario.scenario_id].execute(user, msg)
 
   def run(self):
     self.actor.set_up(log=self.log,
