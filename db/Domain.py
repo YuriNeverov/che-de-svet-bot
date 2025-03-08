@@ -60,10 +60,12 @@ class UserSubscription:
 
 
 class Schedule:
-  def __init__(self, user_id: int, product_id: int, delivery_datetime: str):
+  def __init__(self, user_id: int, product_id: int, delivery_datetime: str,
+               elapsed: bool):
     self.user_id = user_id
     self.product_id = product_id
     self.delivery_datetime = delivery_datetime
+    self.elapsed = elapsed
 
 
 class MessageToOperator:

@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 from sqlite3 import Connection
 from .Domain import (User, Operator, Subscription, Product,
@@ -220,13 +221,23 @@ def get_schedule(conn: Connection, user_id: int,
   row = cursor.fetchone()
   if row is None:
     return None
-  return Schedule(row[0], row[1], row[2])
+  return Schedule(row[0], row[1], row[2], row[3])
+
+
+def fetch_active_schedules(conn: Connection) -> List[Schedule]:
+  cursor = conn.cursor()
+  cursor.execute(
+      "select * from schedules where elapsed = 0 and delivery_datetime < ?",
+      (datetime.now(), ))
+  return [
+      Schedule(row[0], row[1], row[2], row[3]) for row in cursor.fetchall()
+  ]
 
 
 def insert_schedule(conn: Connection, schedule: Schedule) -> Optional[int]:
   cursor = conn.cursor()
   cursor.execute(
-      "insert into schedules (user_id, product_id, delivery_datetime) values (?, ?, ?)",
+      "insert into schedules (user_id, product_id, delivery_datetime, elapsed) values (?, ?, ?, 0)",
       (schedule.user_id, schedule.product_id, schedule.delivery_datetime))
   conn.commit()
   return cursor.lastrowid
@@ -235,8 +246,9 @@ def insert_schedule(conn: Connection, schedule: Schedule) -> Optional[int]:
 def update_schedule(conn: Connection, schedule: Schedule):
   cursor = conn.cursor()
   cursor.execute(
-      "update schedules set delivery_datetime=? where user_id=? and product_id=?",
-      (schedule.delivery_datetime, schedule.user_id, schedule.product_id))
+      "update schedules set delivery_datetime=?, elapsed=? where user_id=? and product_id=?",
+      (schedule.delivery_datetime, schedule.elapsed, schedule.user_id,
+       schedule.product_id))
   conn.commit()
 
 
