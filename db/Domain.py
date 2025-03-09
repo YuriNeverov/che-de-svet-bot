@@ -32,28 +32,24 @@ class Subscription:
 
 
 class Product:
-  def __init__(self, id: int, subscription_id: int, resource_folder_path: str):
+  def __init__(self, id: int, data: str):
     self.id = id
-    self.subscription_id = subscription_id
-    self.resource_folder_path = resource_folder_path
-
-
-class ProductSubscription:
-  def __init__(self, subscription_id: int, product_id: int):
-    self.subscription_id = subscription_id
-    self.product_id = product_id
-
-
-class ProductUserDelivered:
-  def __init__(self, user_id: int, product_id: int):
-    self.user_id = user_id
-    self.product_id = product_id
+    self.data = data
 
 
 class UserSubscription:
-  def __init__(self, user_id: int, subscription_id: int, start_date: str,
-               end_date: Optional[str]):
+  def __init__(self, user_id: int, subscription_id: int, start_date: datetime,
+               end_date: datetime):
     self.user_id = user_id
+    self.subscription_id = subscription_id
+    self.start_date = start_date
+    self.end_date = end_date
+
+
+class UserManualSubscription:
+  def __init__(self, username: str, subscription_id: int, start_date: datetime,
+               end_date: datetime):
+    self.username = username
     self.subscription_id = subscription_id
     self.start_date = start_date
     self.end_date = end_date

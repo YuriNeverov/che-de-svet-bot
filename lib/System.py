@@ -14,6 +14,7 @@ from .scenarios.CheckReadyScenarioExecutor import CheckReadyScenarioExecutor
 from .scenarios.ScheduleScenarioExecutor import ScheduleScenarioExecutor
 from .scenarios.AskScenarioExecutor import AskScenarioExecutor
 from .scenarios.AnswerScenarioExecutor import AnswerScenarioExecutor
+from .scenarios.AdduserScenarioExecutor import AdduserScenarioExecutor
 from .scenarios.SubscribeScenarioExecutor import SubscribeScenarioExecutor
 
 from db.DAO import *
@@ -73,6 +74,26 @@ class System:
     if not get_user_scenario(self.conn, user.id):
       insert_user_scenario(self.conn, UserScenario(user.id, 0, "{}"))
 
+    if user.identifier:
+      for sub in fetch_user_manual_subscriptions_by_name(
+          self.conn, user.identifier):
+        if cur_sub := get_user_subscription(self.conn, user.id,
+                                            sub.subscription_id):
+          if cur_sub.end_date < sub.end_date:
+            update_user_subscription(
+                self.conn,
+                UserSubscription(user.id, sub.subscription_id, sub.start_date,
+                                 sub.end_date))
+          await self.actor.send_text(
+              user.id, f"Ваша подписка продлена до {sub.end_date}")
+        else:
+          insert_user_subscription(
+              self.conn,
+              UserSubscription(user.id, sub.subscription_id, sub.start_date,
+                               sub.end_date))
+          await self.actor.send_text(
+              user.id, f"Ваша подписка активирована до {sub.end_date}")
+
     vars = self.config.read_vars()
     if "operators" in vars and user.identifier and user.identifier in vars[
         "operators"]:
@@ -105,8 +126,13 @@ class System:
         "/schedule": 2,
         "/subscribe": 3,
         "check_ready": 4,  # not a command scenario, so no '/'
+
+        # operator commands start
         "/answer": 5,
+        "/adduser": 6,
+        "/addproduct": 7,
     }
+    self.operator_commands = set(["/answer", "/adduser", "/addproduct"])
     self.check_ready_executor = CheckReadyScenarioExecutor(
         self.log, self.actor, self.conn)
     # yapf: disable
@@ -116,6 +142,7 @@ class System:
         self.scenario_ids["/subscribe"]: SubscribeScenarioExecutor(self.log, self.actor, self.conn),
         self.scenario_ids["check_ready"]: self.check_ready_executor,
         self.scenario_ids["/answer"]: AnswerScenarioExecutor(self.log, self.actor, self.conn),
+        self.scenario_ids["/adduser"]: AdduserScenarioExecutor(self.log, self.actor, self.conn),
     }
     # yapf: enable
     await self.actor.set_commands(
@@ -128,6 +155,11 @@ class System:
         ]))
 
     await self.register_user(self.actor.get_self_user())
+
+    sub_id = 1
+    if not get_subscription(self.conn, sub_id):
+      insert_subscription(
+          self.conn, Subscription(sub_id, "main", 50000, "Main subscription"))
 
     self.timer_registry.new(
         "check_ready", 3, 5,
@@ -164,6 +196,14 @@ class System:
     if command not in self.scenario_ids:
       await self.actor.send_text(msg.chat_id, "Unknown command")
       self.log.info(f"Unknown command from chat {msg.chat_id}: '{command}'")
+      return
+
+    if command in self.operator_commands and not get_operator(
+        self.conn, user.id):
+      await self.actor.send_text(msg.chat_id, "Unknown command")
+      self.log.info(
+          f"Operator command from non-operator chat {msg.chat_id} ('{user.identifier}'): '{command}'"
+      )
       return
 
     update_user_scenario(

@@ -2,14 +2,22 @@ from datetime import datetime
 from typing import List, Optional
 from sqlite3 import Connection
 from .Domain import (User, Operator, Subscription, Product,
-                     ProductSubscription, ProductUserDelivered,
-                     UserSubscription, Schedule, MessageToOperator, Message,
-                     UserScenario)
+                     UserManualSubscription, UserSubscription, Schedule,
+                     MessageToOperator, Message, UserScenario)
 
 
 def get_user(conn: Connection, user_id: int) -> Optional[User]:
   cursor = conn.cursor()
   cursor.execute("select * from users where id=?", (user_id, ))
+  row = cursor.fetchone()
+  if row is None:
+    return None
+  return User(row[0], row[1], row[2], row[3])
+
+
+def find_user_by_name(conn: Connection, username: str) -> Optional[User]:
+  cursor = conn.cursor()
+  cursor.execute("select * from users where identifier=?", (username, ))
   row = cursor.fetchone()
   if row is None:
     return None
@@ -116,14 +124,12 @@ def get_product(conn: Connection, product_id: int) -> Optional[Product]:
   row = cursor.fetchone()
   if row is None:
     return None
-  return Product(row[0], row[1], row[2])
+  return Product(row[0], row[1])
 
 
 def insert_product(conn: Connection, product: Product) -> Optional[int]:
   cursor = conn.cursor()
-  cursor.execute(
-      "insert into products (subscription_id, resource_folder_path) values (?, ?)",
-      (product.subscription_id, product.resource_folder_path))
+  cursor.execute("insert into products (data) values (?)", (product.data))
   conn.commit()
   if cursor.lastrowid is None:
     return None
@@ -133,55 +139,27 @@ def insert_product(conn: Connection, product: Product) -> Optional[int]:
 
 def update_product(conn: Connection, product: Product):
   cursor = conn.cursor()
-  cursor.execute(
-      "update products set subscription_id=?, resource_folder_path=? where id=?",
-      (product.subscription_id, product.resource_folder_path, product.id))
+  cursor.execute("update products set data=? where id=?",
+                 (product.data, product.id))
   conn.commit()
 
 
-def get_product_subscription(conn: Connection, subscription_id: int,
-                             product_id: int) -> Optional[ProductSubscription]:
-  cursor = conn.cursor()
-  cursor.execute(
-      "select * from product_subscriptions where subscription_id=? and product_id=?",
-      (subscription_id, product_id))
-  row = cursor.fetchone()
-  if row is None:
-    return None
-  return ProductSubscription(row[0], row[1])
-
-
-def insert_product_subscription(
-    conn: Connection,
-    product_subscription: ProductSubscription) -> Optional[int]:
+def insert_product_subscription(conn: Connection, subscription_id: int,
+                                product_id: int) -> Optional[int]:
   cursor = conn.cursor()
   cursor.execute(
       "insert into product_subscriptions (subscription_id, product_id) values (?, ?)",
-      (product_subscription.subscription_id, product_subscription.product_id))
+      (subscription_id, product_id))
   conn.commit()
   return cursor.lastrowid
 
 
-def get_product_user_delivered(
-    conn: Connection, user_id: int,
-    product_id: int) -> Optional[ProductUserDelivered]:
-  cursor = conn.cursor()
-  cursor.execute(
-      "select * from product_user_delivered where user_id=? and product_id=?",
-      (user_id, product_id))
-  row = cursor.fetchone()
-  if row is None:
-    return None
-  return ProductUserDelivered(row[0], row[1])
-
-
-def insert_product_user_delivered(
-    conn: Connection,
-    product_user_delivered: ProductUserDelivered) -> Optional[int]:
+def insert_product_user_delivered(conn: Connection, user_id: int,
+                                  product_id: int) -> Optional[int]:
   cursor = conn.cursor()
   cursor.execute(
       "insert into product_user_delivered (user_id, product_id) values (?, ?)",
-      (product_user_delivered.user_id, product_user_delivered.product_id))
+      (user_id, product_id))
   conn.commit()
   return cursor.lastrowid
 
@@ -217,6 +195,44 @@ def update_user_subscription(conn: Connection,
       (user_subscription.start_date, user_subscription.end_date,
        user_subscription.user_id, user_subscription.subscription_id))
   conn.commit()
+
+
+def insert_user_manual_subscription(
+    conn: Connection,
+    user_subscription: UserManualSubscription) -> Optional[int]:
+  cursor = conn.cursor()
+  cursor.execute(
+      "insert into user_manual_subscriptions (user_identifier, subscription_id, start_date, end_date) values (?, ?, ?, ?)",
+      (user_subscription.username, user_subscription.subscription_id,
+       user_subscription.start_date, user_subscription.end_date))
+  conn.commit()
+  return cursor.lastrowid
+
+
+def get_user_manual_subscription(
+    conn: Connection, username: str,
+    subscription_id: int) -> Optional[UserManualSubscription]:
+  cursor = conn.cursor()
+  cursor.execute(
+      "select * from user_manual_subscriptions where user_identifier=? and subscription_id=?",
+      (username, subscription_id))
+  row = cursor.fetchone()
+  if row is None:
+    return None
+  return UserManualSubscription(row[0], row[1], row[2], row[3])
+
+
+def fetch_user_manual_subscriptions_by_name(
+    conn: Connection, username: str) -> List[UserManualSubscription]:
+  cursor = conn.cursor()
+  cursor.execute(
+      "select * from user_manual_subscriptions where user_identifier=?",
+      (username, ))
+  res: List[UserManualSubscription] = []
+  rows = cursor.fetchall()
+  for row in rows:
+    res.append(UserManualSubscription(row[0], row[1], row[2], row[3]))
+  return res
 
 
 def get_schedule(conn: Connection, user_id: int,

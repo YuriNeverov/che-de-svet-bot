@@ -26,12 +26,8 @@ create table if not exists subscriptions (
 
 create table if not exists products (
   id integer primary key,
-  subscription_id integer,
-  resource_folder_path text not null,
-  foreign key (subscription_id) references subscriptions(id)
+  data text not null
 );
-
-create index if not exists products_subscription_id_idx on products (subscription_id);
 
 create table if not exists product_subscriptions (
   subscription_id integer not null,
@@ -58,8 +54,8 @@ create index if not exists product_user_delivered_product_id_idx on product_user
 create table if not exists user_subscriptions (
   user_id integer not null,
   subscription_id integer not null,
-  start_date datetime,
-  end_date datetime,
+  start_date datetime not null,
+  end_date datetime not null,
   foreign key (user_id) references users(id),
   foreign key (subscription_id) references subscriptions(id),
   primary key (user_id, subscription_id)
@@ -67,6 +63,18 @@ create table if not exists user_subscriptions (
 
 create index if not exists user_subscriptions_user_id_idx on user_subscriptions (user_id);
 create index if not exists user_subscriptions_subscription_id_idx on user_subscriptions (subscription_id);
+
+create table if not exists user_manual_subscriptions (
+  user_identifier text not null,
+  subscription_id integer not null,
+  start_date datetime not null,
+  end_date datetime not null,
+  foreign key (subscription_id) references subscriptions(id),
+  primary key (user_identifier, subscription_id)
+);
+
+create index if not exists user_manual_subscriptions_user_identifier_idx on user_manual_subscriptions (user_identifier);
+create index if not exists user_manual_subscriptions_subscription_id_idx on user_manual_subscriptions (subscription_id);
 
 create table if not exists schedules (
   user_id integer not null,
