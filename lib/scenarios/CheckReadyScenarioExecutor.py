@@ -15,16 +15,16 @@ class CheckReadyScenarioExecutor(ScenarioExecutorInterface):
     super().__init__(log, actor, conn)
 
   async def execute(self, user: User, msg: Message):
-    await self.actor.reply_to(msg,
-                              "This command is not implemented yet",
-                              reply=False)
+    await self.actor.send_text(msg.chat_id,
+                               "This command is not implemented yet")
 
   async def check_ready(self):
     def send_message(user: User, text: str):
       async def sender():
-        await self.actor.send_text_message(user.id, text)
+        await self.actor.send_text(user.id, text)
 
       return sender
+    return
 
     for user in fetch_users(self.conn):
       if user.id == self.actor.get_self_user().id: continue

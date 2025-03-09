@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Coroutine, Optional
+from typing import Callable, Optional
 
 from lib.Domain import CommandSet, Panel, Quiz
+from lib.Function import AsyncResult
 from lib.Log import Log
 from db.Domain import Message, User
 
@@ -16,10 +17,10 @@ class ActorInterface(ABC):
   def set_up(
       self,
       log: Log,
-      on_command: Callable[[str, User, Message], Coroutine[Any, Any, None]],
-      on_message: Callable[[User, Message], Coroutine[Any, Any, None]],
-      on_init: Optional[Callable[[], Coroutine[Any, Any,
-                                               None]]] = None) -> None:
+      on_command: Callable[[str, User, Message], AsyncResult[None]],
+      on_message: Callable[[User, Message], AsyncResult[None]],
+      on_sent_message: Callable[[Message], AsyncResult[None]],
+      on_init: Optional[Callable[[], AsyncResult[None]]] = None) -> None:
     pass
 
   @abstractmethod
@@ -35,24 +36,25 @@ class ActorInterface(ABC):
     pass
 
   @abstractmethod
-  async def send_text_message(self, chat_id: int,
-                              text: str) -> Optional[Message]:
+  async def send_text(self,
+                      chat_id: int,
+                      text: str,
+                      reply_to: Optional[int] = None) -> Optional[Message]:
     pass
 
   @abstractmethod
-  async def reply_to(self,
-                     msg: Message,
-                     text: str,
-                     reply: bool = True) -> Optional[Message]:
+  async def send_panel(self,
+                       chat_id: int,
+                       text: str,
+                       panel: Panel,
+                       reply_to: Optional[int] = None) -> Optional[int]:
     pass
 
   @abstractmethod
-  async def send_panel(self, chat_id: int, text: str,
-                       panel: Panel) -> Optional[int]:
-    pass
-
-  @abstractmethod
-  async def send_quiz(self, chat_id: int, quiz: Quiz) -> Optional[int]:
+  async def send_quiz(self,
+                      chat_id: int,
+                      quiz: Quiz,
+                      reply_to: Optional[int] = None) -> Optional[int]:
     pass
 
   @abstractmethod

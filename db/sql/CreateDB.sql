@@ -106,8 +106,7 @@ create table if not exists messages (
   sent_datetime datetime not null,
   reply_to integer,
   primary key (chat_id, id),
-  foreign key (sender_user_id) references users (id),
-  foreign key (reply_to) references messages (id)
+  foreign key (sender_user_id) references users (id)
 );
 
 create index if not exists messages_sender_user_id_idx on messages (sender_user_id);

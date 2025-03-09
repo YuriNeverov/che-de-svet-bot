@@ -50,7 +50,7 @@ def get_operator(conn: Connection, operator_id: int) -> Optional[Operator]:
   return Operator(row[0], row[1], row[2])
 
 
-def get_all_operators(conn: Connection) -> List[Operator]:
+def fetch_operators(conn: Connection) -> List[Operator]:
   cursor = conn.cursor()
   cursor.execute("select * from operators")
   res: List[Operator] = []
@@ -318,7 +318,6 @@ def insert_message(conn: Connection, message: Message) -> Optional[int]:
   conn.commit()
   if cursor.lastrowid is None:
     return None
-  message.id = cursor.lastrowid
   return message.id
 
 
@@ -356,4 +355,11 @@ def update_user_scenario(conn: Connection, user_scenario: UserScenario):
   cursor.execute(
       "update user_scenarios set state=?, scenario_id=? where user_id=?",
       (user_scenario.state, user_scenario.scenario_id, user_scenario.user_id))
+  conn.commit()
+
+
+def update_user_scenario_state(conn: Connection, user_id: int, state: str):
+  cursor = conn.cursor()
+  cursor.execute("update user_scenarios set state=? where user_id=?",
+                 (state, user_id))
   conn.commit()

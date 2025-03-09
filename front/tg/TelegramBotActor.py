@@ -1,11 +1,12 @@
 import asyncio
 from datetime import datetime
-from typing import Any, Callable, Coroutine, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar
 from telegram import Bot, BotCommand, BotCommandScopeChat, Update, User
 from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler
 
 from db.Domain import Message, User as DomainUser
 from lib.ActorInterface import ActorInterface
+from lib.Function import AsyncResult
 from lib.Log import Log
 from lib.Domain import CommandSet, Panel, Quiz
 
@@ -22,20 +23,20 @@ class TelegramBotActor(ActorInterface):
     self.event_loop: asyncio.AbstractEventLoop
     self.log: Optional[Log] = None
     self.app: Application[Any, Any, Any, Any, Any, Any]
-    self.active_panels: dict[str, Panel] = {}
+    self.active_panels: dict[int, Panel] = {}
 
   def set_up(
       self,
       log: Log,
-      on_command: Callable[[str, DomainUser, Message], Coroutine[Any, Any,
-                                                                 None]],
-      on_message: Callable[[DomainUser, Message], Coroutine[Any, Any, None]],
-      on_init: Optional[Callable[[], Coroutine[Any, Any,
-                                               None]]] = None) -> None:
+      on_command: Callable[[str, DomainUser, Message], AsyncResult[None]],
+      on_message: Callable[[DomainUser, Message], AsyncResult[None]],
+      on_sent_message: Callable[[Message], AsyncResult[None]],
+      on_init: Optional[Callable[[], AsyncResult[None]]] = None) -> None:
     self.log = log
+    self.on_sent_message = on_sent_message
 
     async def handle_message(update: Update,
-                             handler: Callable[..., Coroutine[Any, Any, None]],
+                             handler: Callable[..., AsyncResult[None]],
                              isCommand: bool) -> None:
       try:
         if not update.message or not update.message.text or not update.message.from_user:
@@ -55,10 +56,9 @@ class TelegramBotActor(ActorInterface):
         except Exception as e:
           if self.log:
             self.log.error(f"Message handler failed: {e}")
-          await self.reply_to(
-              message,
-              "An error occurred while processing your message",
-              reply=True)
+          await self.send_text(
+              message.chat_id,
+              "An error occurred while processing your message", message.id)
 
       except Exception as e:
         if self.log:
@@ -92,18 +92,27 @@ class TelegramBotActor(ActorInterface):
     async def button_handler(update: Update, context: Any):
       try:
         query = update.callback_query
-        if not query or not query.data:
+        user = update.effective_user
+        if not query or not query.data or not user:
           return
 
         callback_data = query.data
-        if callback_data in self.active_panels:
-          panel = self.active_panels[callback_data]
+        was_click = False
+        if user.id in self.active_panels:
+          panel = self.active_panels[user.id]
           for row in panel.buttons:
             for btn in row:
               if btn.callback_data == callback_data:
+                was_click = True
                 if btn.on_click:
                   btn.on_click()
                 break
+        if was_click:
+          del self.active_panels[user.id]
+        else:
+          await self.send_text(
+              user.id,
+              "Похоже, что панель, кнопку которой вы нажали, уже устарела.")
 
         await query.answer()
       except Exception as e:
@@ -136,26 +145,32 @@ class TelegramBotActor(ActorInterface):
           reply_to_message_id=msg.reply_to)
       msg.sent_datetime = actual_msg.date
       msg.id = actual_msg.id
+      await self.on_sent_message(msg)
       return actual_msg.id
     except Exception as e:
       if self.log:
         self.log.error(f"Failed to send message to {msg.chat_id}: {e}")
       return None
 
-  async def send_text_message(self, chat_id: int,
-                              text: str) -> Optional[Message]:
+  async def send_text(self,
+                      chat_id: int,
+                      text: str,
+                      reply_to: Optional[int] = None) -> Optional[Message]:
     reply_msg = Message(chat_id=chat_id,
                         id=0,
                         sender_user_id=self.get_self_user().id,
                         msg_text=text,
                         msg_resource_path=None,
                         sent_datetime=datetime.now(),
-                        reply_to=None)
+                        reply_to=reply_to)
     await self.send_message(reply_msg)
     return reply_msg
 
-  async def send_panel(self, chat_id: int, text: str,
-                       panel: Panel) -> Optional[int]:
+  async def send_panel(self,
+                       chat_id: int,
+                       text: str,
+                       panel: Panel,
+                       reply_to: Optional[int] = None) -> Optional[int]:
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
     try:
@@ -164,13 +179,12 @@ class TelegramBotActor(ActorInterface):
           for btn in row
       ] for row in panel.buttons]
 
-      for row in panel.buttons:
-        for btn in row:
-          self.active_panels[btn.callback_data] = panel
+      self.active_panels[chat_id] = panel
 
       message = await self.bot.send_message(
           chat_id=chat_id,
           text=text,
+          reply_to_message_id=reply_to,
           reply_markup=InlineKeyboardMarkup(keyboard))
 
       return message.message_id
@@ -179,21 +193,10 @@ class TelegramBotActor(ActorInterface):
         self.log.error(f"Failed to send panel to {chat_id}: {e}")
       return None
 
-  async def reply_to(self,
-                     msg: Message,
-                     text: str,
-                     reply: bool = True) -> Optional[Message]:
-    reply_msg = Message(id=0,
-                        sender_user_id=self.get_self_user().id,
-                        chat_id=msg.chat_id,
-                        msg_text=text,
-                        msg_resource_path="",
-                        sent_datetime=datetime.now(),
-                        reply_to=msg.id if reply else None)
-    await self.send_message(reply_msg)
-    return reply_msg
-
-  async def send_quiz(self, chat_id: int, quiz: Quiz) -> Optional[int]:
+  async def send_quiz(self,
+                      chat_id: int,
+                      quiz: Quiz,
+                      reply_to: Optional[int] = None) -> Optional[int]:
     try:
       if len(quiz.options) > 10:
         raise ValueError("Telegram quizzes support maximum 10 options")
@@ -210,7 +213,8 @@ class TelegramBotActor(ActorInterface):
                                          options=quiz.options,
                                          type="quiz",
                                          correct_option_id=correct_option,
-                                         is_anonymous=False)
+                                         is_anonymous=False,
+                                         reply_to_message_id=reply_to)
       return message.message_id
     except Exception as e:
       if self.log:

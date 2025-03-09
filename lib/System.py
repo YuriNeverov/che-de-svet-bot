@@ -12,7 +12,8 @@ from .Domain import *
 from .scenarios.ScenarioExecutorInterface import ScenarioExecutorInterface
 from .scenarios.CheckReadyScenarioExecutor import CheckReadyScenarioExecutor
 from .scenarios.ScheduleScenarioExecutor import ScheduleScenarioExecutor
-from .scenarios.SendMessageScenarioExecutor import SendMessageScenarioExecutor
+from .scenarios.AskScenarioExecutor import AskScenarioExecutor
+from .scenarios.AnswerScenarioExecutor import AnswerScenarioExecutor
 from .scenarios.SubscribeScenarioExecutor import SubscribeScenarioExecutor
 
 from db.DAO import *
@@ -59,7 +60,7 @@ class System:
         self.conn.close()
       raise
 
-  def register_user(self, user: User):
+  async def register_user(self, user: User):
     self.log.debug(f"User {user.id},{user.identifier} check")
 
     if maybe_user := get_user(self.conn, user.id):
@@ -72,62 +73,96 @@ class System:
     if not get_user_scenario(self.conn, user.id):
       insert_user_scenario(self.conn, UserScenario(user.id, 0, "{}"))
 
+    vars = self.config.read_vars()
+    if "operators" in vars and user.identifier and user.identifier in vars[
+        "operators"]:
+      try:
+        rank = int(vars["operators"][user.identifier])
+      except ValueError:
+        self.log.error(
+            f"Invalid operator rank for user {user.identifier}: {vars['operators'][user.identifier]}"
+        )
+        return
+      updated = Operator(user.id, user.identifier, rank)
+      if get_operator(self.conn, user.id):
+        update_operator(self.conn, updated)
+      else:
+        insert_operator(self.conn, updated)
+      await self.set_operator_commands(updated)
+      self.log.debug(f"User {user.identifier} is an operator with rank {rank}")
+
+  async def set_operator_commands(self, operator: Operator):
+    await self.actor.set_commands(
+        CommandSet([
+            Command("answer", "Answer the user's message"),
+            Command("adduser", "Add a user to subscription list"),
+        ],
+                   scope=[operator.id]))
+
   async def on_actor_init(self):
     self.scenario_ids = {
-        "/message": 1,
+        "/ask": 1,
         "/schedule": 2,
         "/subscribe": 3,
         "check_ready": 4,  # not a command scenario, so no '/'
+        "/answer": 5,
     }
     self.check_ready_executor = CheckReadyScenarioExecutor(
         self.log, self.actor, self.conn)
+    # yapf: disable
     self.scenario_executors: Dict[int, ScenarioExecutorInterface] = {
-        self.scenario_ids["/message"]:
-        SendMessageScenarioExecutor(self.log, self.actor, self.conn),
-        self.scenario_ids["/schedule"]:
-        ScheduleScenarioExecutor(self.log, self.actor, self.conn),
-        self.scenario_ids["/subscribe"]:
-        SubscribeScenarioExecutor(self.log, self.actor, self.conn),
-        self.scenario_ids["check_ready"]:
-        self.check_ready_executor,
+        self.scenario_ids["/ask"]: AskScenarioExecutor(self.log, self.actor, self.conn),
+        self.scenario_ids["/schedule"]: ScheduleScenarioExecutor(self.log, self.actor, self.conn),
+        self.scenario_ids["/subscribe"]: SubscribeScenarioExecutor(self.log, self.actor, self.conn),
+        self.scenario_ids["check_ready"]: self.check_ready_executor,
+        self.scenario_ids["/answer"]: AnswerScenarioExecutor(self.log, self.actor, self.conn),
     }
+    # yapf: enable
     await self.actor.set_commands(
         CommandSet([
             Command("start", "Start the bot"),
             Command("help", "Get help message"),
-            Command("message", "Send next message to the operator"),
+            Command("ask", "Send next message to the operator"),
             Command("schedule", "Schedule next bot interaction"),
             Command("subscribe", "Purchase a subscription"),
         ]))
 
-    self.register_user(self.actor.get_self_user())
+    await self.register_user(self.actor.get_self_user())
 
     self.timer_registry.new(
         "check_ready", 3, 5,
         AsyncWithContext(self.check_ready_executor.check_ready,
                          self.actor.get_event_loop()))
 
+  async def on_sent_message(self, msg: Message):
+    insert_message(self.conn, msg)
+
   async def on_message(self, user: User, msg: Message):
-    self.register_user(user)
+    await self.register_user(user)
     self.log.debug(f"Received message from {msg.chat_id}: '{msg.msg_text}'")
+    insert_message(self.conn, msg)
+    await self.execute_scenario(user, msg)
 
   async def on_command(self, command: str, user: User, msg: Message):
-    self.register_user(user)
+    await self.register_user(user)
+    insert_message(self.conn, msg)
 
     if command == "/help":
       vars = self.config.read_vars()
-      await self.actor.reply_to(msg, self.config.read_help_msg(vars))
+      await self.actor.send_text(msg.chat_id, self.config.read_help_msg(vars),
+                                 msg.id)
       self.log.info(f"Sent help message to {msg.chat_id}")
       return
     if command == "/start":
       vars = self.config.read_vars()
       vars["username"] = user.prettyName()
-      await self.actor.reply_to(msg, self.config.read_start_msg(vars))
+      await self.actor.send_text(msg.chat_id, self.config.read_start_msg(vars),
+                                 msg.id)
       self.log.info(f"Started dialog with {msg.chat_id}, replying to {msg.id}")
       return
 
     if command not in self.scenario_ids:
-      await self.actor.reply_to(msg, "Unknown command", reply=False)
+      await self.actor.send_text(msg.chat_id, "Unknown command")
       self.log.info(f"Unknown command from chat {msg.chat_id}: '{command}'")
       return
 
@@ -145,6 +180,7 @@ class System:
     self.actor.set_up(log=self.log,
                       on_command=self.on_command,
                       on_message=self.on_message,
+                      on_sent_message=self.on_sent_message,
                       on_init=self.on_actor_init)
     self.actor.run()
 
