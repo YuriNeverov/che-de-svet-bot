@@ -142,6 +142,18 @@ class TelegramBotActor(ActorInterface):
         self.log.error(f"Failed to send message to {msg.chat_id}: {e}")
       return None
 
+  async def send_text_message(self, chat_id: int,
+                              text: str) -> Optional[Message]:
+    reply_msg = Message(chat_id=chat_id,
+                        id=0,
+                        sender_user_id=self.get_self_user().id,
+                        msg_text=text,
+                        msg_resource_path=None,
+                        sent_datetime=datetime.now(),
+                        reply_to=None)
+    await self.send_message(reply_msg)
+    return reply_msg
+
   async def send_panel(self, chat_id: int, text: str,
                        panel: Panel) -> Optional[int]:
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -205,30 +217,8 @@ class TelegramBotActor(ActorInterface):
         self.log.error(f"Failed to send quiz to {chat_id}: {e}")
       return None
 
-  def set_commands_s(self, command_set: CommandSet) -> None:
-    self.do_sync(self.set_commands(command_set))
-
-  def send_message_s(self, msg: Message) -> None:
-    self.do_sync(self.send_message(msg))
-
-  def reply_to_s(self, msg: Message, text: str, reply: bool = True) -> None:
-    self.do_sync(self.reply_to(msg, text, reply))
-
-  def send_panel_s(self, chat_id: int, text: str,
-                   panel: "Panel") -> Optional[int]:
-    return self.do_sync(self.send_panel(chat_id, text, panel))
-
-  def send_quiz_s(self, chat_id: int, quiz: Quiz) -> Optional[int]:
-    return self.do_sync(self.send_quiz(chat_id, quiz))
-
-  def do_sync(self, coro: Coroutine[Any, Any, T]) -> Optional[T]:
-    try:
-      future = asyncio.run_coroutine_threadsafe(coro, self.event_loop)
-      return future.result()
-    except Exception as e:
-      if self.log:
-        self.log.error(f"Failed to execute synchronously: {e}")
-      return None
-
   def get_self_user(self) -> DomainUser:
     return to_domain_user(self.info)
+
+  def get_event_loop(self) -> asyncio.AbstractEventLoop:
+    return self.event_loop

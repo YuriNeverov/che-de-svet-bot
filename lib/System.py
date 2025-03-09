@@ -2,6 +2,8 @@ import sqlite3
 
 from typing import Dict
 
+from lib.Function import AsyncWithContext
+
 from .ActorInterface import ActorInterface
 from .Config import Config
 from .Timer import TimerRegistry
@@ -70,13 +72,15 @@ class System:
     if not get_user_scenario(self.conn, user.id):
       insert_user_scenario(self.conn, UserScenario(user.id, 0, "{}"))
 
-  async def on_init(self):
+  async def on_actor_init(self):
     self.scenario_ids = {
         "/message": 1,
         "/schedule": 2,
         "/subscribe": 3,
         "check_ready": 4,  # not a command scenario, so no '/'
     }
+    self.check_ready_executor = CheckReadyScenarioExecutor(
+        self.log, self.actor, self.conn)
     self.scenario_executors: Dict[int, ScenarioExecutorInterface] = {
         self.scenario_ids["/message"]:
         SendMessageScenarioExecutor(self.log, self.actor, self.conn),
@@ -85,7 +89,7 @@ class System:
         self.scenario_ids["/subscribe"]:
         SubscribeScenarioExecutor(self.log, self.actor, self.conn),
         self.scenario_ids["check_ready"]:
-        CheckReadyScenarioExecutor(self.log, self.actor, self.conn),
+        self.check_ready_executor,
     }
     await self.actor.set_commands(
         CommandSet([
@@ -97,6 +101,11 @@ class System:
         ]))
 
     self.register_user(self.actor.get_self_user())
+
+    self.timer_registry.new(
+        "check_ready", 3, 5,
+        AsyncWithContext(self.check_ready_executor.check_ready,
+                         self.actor.get_event_loop()))
 
   async def on_message(self, user: User, msg: Message):
     self.register_user(user)
@@ -136,7 +145,7 @@ class System:
     self.actor.set_up(log=self.log,
                       on_command=self.on_command,
                       on_message=self.on_message,
-                      on_init=self.on_init)
+                      on_init=self.on_actor_init)
     self.actor.run()
 
   def __del__(self):

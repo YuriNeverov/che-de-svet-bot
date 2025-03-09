@@ -1,10 +1,12 @@
-from typing import Any, Callable, List, Optional
+from typing import List, Optional
 
 import uuid
 
+from .Function import Function
+
 
 class Button:
-  def __init__(self, text: str, on_click: Optional[Callable[..., Any]] = None):
+  def __init__(self, text: str, on_click: Optional[Function] = None):
     self.text = text
     self.callback_data = str(uuid.uuid4())
     self.on_click = on_click

@@ -1,21 +1,22 @@
 import threading
 import time
-from typing import Callable, Any, Dict, List
+from typing import Any, Dict, List
+
+from .Function import Function
 
 
 class Timer:
   def __init__(self, registry: "TimerRegistry", name: str, times: int,
-               duration: float, func: Callable[..., Any], *args: Any,
-               **kwargs: Any):
+               duration: float, func: Function, *args: Any, **kwargs: Any):
     self.registry = registry
     self.name = name
     self.times = times
     self.duration = duration
-    self.func = func
     self.args = args
     self.kwargs = kwargs
     self._stop_event = threading.Event()
     self._thread = threading.Thread(target=self._run)
+    self.func = func
 
   def start(self):
     self._thread.start()
@@ -43,8 +44,8 @@ class TimerRegistry:
   def __init__(self):
     self._timers: Dict[str, Timer] = {}
 
-  def new(self, name: str, times: int, duration: float,
-          func: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
+  def new(self, name: str, times: int, duration: float, func: Function, *args:
+          Any, **kwargs: Any) -> None:
     if name in self._timers:
       return
     timer = Timer(self, name, times, duration, func, *args, **kwargs)

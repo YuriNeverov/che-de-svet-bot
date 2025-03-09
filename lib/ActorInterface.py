@@ -5,6 +5,8 @@ from lib.Domain import CommandSet, Panel, Quiz
 from lib.Log import Log
 from db.Domain import Message, User
 
+from asyncio import AbstractEventLoop
+
 
 class ActorInterface(ABC):
   def __init__(self) -> None:
@@ -33,6 +35,11 @@ class ActorInterface(ABC):
     pass
 
   @abstractmethod
+  async def send_text_message(self, chat_id: int,
+                              text: str) -> Optional[Message]:
+    pass
+
+  @abstractmethod
   async def reply_to(self,
                      msg: Message,
                      text: str,
@@ -49,26 +56,9 @@ class ActorInterface(ABC):
     pass
 
   @abstractmethod
-  def set_commands_s(self, command_set: CommandSet) -> None:
-    pass
-
-  @abstractmethod
-  def send_message_s(self, msg: Message) -> None:
-    pass
-
-  @abstractmethod
-  def reply_to_s(self, msg: Message, text: str, reply: bool = True) -> None:
-    pass
-
-  @abstractmethod
-  def send_panel_s(self, chat_id: int, text: str,
-                   panel: Panel) -> Optional[int]:
-    pass
-
-  @abstractmethod
-  def send_quiz_s(self, chat_id: int, quiz: Quiz) -> Optional[int]:
-    pass
-
-  @abstractmethod
   def get_self_user(self) -> User:
+    pass
+
+  @abstractmethod
+  def get_event_loop(self) -> AbstractEventLoop:
     pass

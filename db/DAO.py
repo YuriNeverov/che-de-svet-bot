@@ -27,6 +27,12 @@ def insert_user(conn: Connection, user: User) -> Optional[int]:
   return user.id
 
 
+def fetch_users(conn: Connection) -> List[User]:
+  cursor = conn.cursor()
+  cursor.execute("select * from users")
+  return [User(row[0], row[1], row[2], row[3]) for row in cursor.fetchall()]
+
+
 def update_user(conn: Connection, user: User):
   cursor = conn.cursor()
   cursor.execute(
