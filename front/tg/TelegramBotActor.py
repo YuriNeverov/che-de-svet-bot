@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Callable, Optional, TypeVar
 from telegram import Bot, BotCommand, BotCommandScopeChat, Update, User
 from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler
@@ -161,7 +161,7 @@ class TelegramBotActor(ActorInterface):
                         sender_user_id=self.get_self_user().id,
                         msg_text=text,
                         msg_resource_path=None,
-                        sent_datetime=datetime.now(),
+                        sent_datetime=datetime.now(timezone.utc),
                         reply_to=reply_to)
     await self.send_message(reply_msg)
     return reply_msg

@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from lib.Config import Config
 from lib.Domain import Button, Panel
 from lib.Function import AsyncWithContext
 from .ScenarioExecutorInterface import ScenarioExecutorInterface
@@ -12,8 +13,9 @@ from db.Domain import Message, User, UserScenario
 
 
 class AdduserScenarioExecutor(ScenarioExecutorInterface):
-  def __init__(self, log: Log, actor: ActorInterface, conn: Connection):
-    super().__init__(log, actor, conn)
+  def __init__(self, log: Log, actor: ActorInterface, conn: Connection,
+               config: Config):
+    super().__init__(log, actor, conn, config)
 
   async def execute(self, user: User, msg: Message):
     scenario = get_user_scenario(self.conn, user.id)
@@ -31,7 +33,7 @@ class AdduserScenarioExecutor(ScenarioExecutorInterface):
 
     def on_click_yes():
       async def callback():
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         then = now + timedelta(days=30)
         #TODO: track subscriptions
         sub_id = 1

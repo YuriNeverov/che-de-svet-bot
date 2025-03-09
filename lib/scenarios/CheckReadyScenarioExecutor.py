@@ -1,3 +1,4 @@
+from lib.Config import Config
 from .ScenarioExecutorInterface import ScenarioExecutorInterface
 
 from sqlite3 import Connection
@@ -11,8 +12,9 @@ from db.DAO import fetch_users
 
 
 class CheckReadyScenarioExecutor(ScenarioExecutorInterface):
-  def __init__(self, log: Log, actor: ActorInterface, conn: Connection):
-    super().__init__(log, actor, conn)
+  def __init__(self, log: Log, actor: ActorInterface, conn: Connection,
+               config: Config):
+    super().__init__(log, actor, conn, config)
 
   async def execute(self, user: User, msg: Message):
     await self.actor.send_text(msg.chat_id,
@@ -24,6 +26,7 @@ class CheckReadyScenarioExecutor(ScenarioExecutorInterface):
         await self.actor.send_text(user.id, text)
 
       return sender
+
     return
 
     for user in fetch_users(self.conn):

@@ -56,8 +56,8 @@ class UserManualSubscription:
 
 
 class Schedule:
-  def __init__(self, user_id: int, product_id: int, delivery_datetime: str,
-               elapsed: bool):
+  def __init__(self, user_id: int, product_id: int,
+               delivery_datetime: datetime, elapsed: bool):
     self.user_id = user_id
     self.product_id = product_id
     self.delivery_datetime = delivery_datetime

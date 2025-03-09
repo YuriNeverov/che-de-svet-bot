@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from sqlite3 import Connection
 from .Domain import (User, Operator, Subscription, Product,
@@ -173,7 +173,8 @@ def get_user_subscription(conn: Connection, user_id: int,
   row = cursor.fetchone()
   if row is None:
     return None
-  return UserSubscription(row[0], row[1], row[2], row[3])
+  return UserSubscription(row[0], row[1], datetime.fromisoformat(row[2]),
+                          datetime.fromisoformat(row[3]))
 
 
 def insert_user_subscription(
@@ -219,7 +220,8 @@ def get_user_manual_subscription(
   row = cursor.fetchone()
   if row is None:
     return None
-  return UserManualSubscription(row[0], row[1], row[2], row[3])
+  return UserManualSubscription(row[0], row[1], datetime.fromisoformat(row[2]),
+                                datetime.fromisoformat(row[3]))
 
 
 def fetch_user_manual_subscriptions_by_name(
@@ -231,7 +233,9 @@ def fetch_user_manual_subscriptions_by_name(
   res: List[UserManualSubscription] = []
   rows = cursor.fetchall()
   for row in rows:
-    res.append(UserManualSubscription(row[0], row[1], row[2], row[3]))
+    res.append(
+        UserManualSubscription(row[0], row[1], datetime.fromisoformat(row[2]),
+                               datetime.fromisoformat(row[3])))
   return res
 
 
@@ -243,16 +247,17 @@ def get_schedule(conn: Connection, user_id: int,
   row = cursor.fetchone()
   if row is None:
     return None
-  return Schedule(row[0], row[1], row[2], row[3])
+  return Schedule(row[0], row[1], datetime.fromisoformat(row[2]), row[3])
 
 
 def fetch_active_schedules(conn: Connection) -> List[Schedule]:
   cursor = conn.cursor()
   cursor.execute(
       "select * from schedules where elapsed = 0 and delivery_datetime < ?",
-      (datetime.now(), ))
+      (datetime.now(timezone.utc), ))
   return [
-      Schedule(row[0], row[1], row[2], row[3]) for row in cursor.fetchall()
+      Schedule(row[0], row[1], datetime.fromisoformat(row[2]), row[3])
+      for row in cursor.fetchall()
   ]
 
 
@@ -282,8 +287,25 @@ def get_message_to_operator(conn: Connection,
   row = cursor.fetchone()
   if row is None:
     return None
-  return MessageToOperator(row[0], row[1], row[2], row[3], row[4], row[5],
-                           row[6])
+  return MessageToOperator(row[0], row[1], row[2], row[3], row[4],
+                           datetime.fromisoformat(row[5]),
+                           datetime.fromisoformat(row[6]) if row[6] else None)
+
+
+def fetch_messages_to_operator_from_user_ordered(
+    conn: Connection, user_id: int, limit: int) -> List[MessageToOperator]:
+  cursor = conn.cursor()
+  cursor.execute(
+      "select * from messages_to_operators where user_id=? order by sent_datetime desc limit ?",
+      (user_id, limit))
+  res: List[MessageToOperator] = []
+  rows = cursor.fetchall()
+  for row in rows:
+    res.append(
+        MessageToOperator(row[0], row[1], row[2], row[3], row[4],
+                          datetime.fromisoformat(row[5]),
+                          datetime.fromisoformat(row[6]) if row[6] else None))
+  return res
 
 
 def insert_message_to_operator(
@@ -322,7 +344,8 @@ def get_message(conn: Connection, chat_id: int,
   row = cursor.fetchone()
   if row is None:
     return None
-  return Message(row[0], row[1], row[2], row[3], row[4], row[5], row[6])
+  return Message(row[0], row[1], row[2], row[3], row[4],
+                 datetime.fromisoformat(row[5]), row[6])
 
 
 def insert_message(conn: Connection, message: Message) -> Optional[int]:

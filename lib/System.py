@@ -84,8 +84,8 @@ class System:
                 self.conn,
                 UserSubscription(user.id, sub.subscription_id, sub.start_date,
                                  sub.end_date))
-          await self.actor.send_text(
-              user.id, f"Ваша подписка продлена до {sub.end_date}")
+            await self.actor.send_text(
+                user.id, f"Ваша подписка продлена до {sub.end_date}")
         else:
           insert_user_subscription(
               self.conn,
@@ -134,15 +134,15 @@ class System:
     }
     self.operator_commands = set(["/answer", "/adduser", "/addproduct"])
     self.check_ready_executor = CheckReadyScenarioExecutor(
-        self.log, self.actor, self.conn)
+        self.log, self.actor, self.conn, self.config)
     # yapf: disable
     self.scenario_executors: Dict[int, ScenarioExecutorInterface] = {
-        self.scenario_ids["/ask"]: AskScenarioExecutor(self.log, self.actor, self.conn),
-        self.scenario_ids["/schedule"]: ScheduleScenarioExecutor(self.log, self.actor, self.conn),
-        self.scenario_ids["/subscribe"]: SubscribeScenarioExecutor(self.log, self.actor, self.conn),
+        self.scenario_ids["/ask"]: AskScenarioExecutor(self.log, self.actor, self.conn, self.config),
+        self.scenario_ids["/schedule"]: ScheduleScenarioExecutor(self.log, self.actor, self.conn, self.config),
+        self.scenario_ids["/subscribe"]: SubscribeScenarioExecutor(self.log, self.actor, self.conn, self.config),
         self.scenario_ids["check_ready"]: self.check_ready_executor,
-        self.scenario_ids["/answer"]: AnswerScenarioExecutor(self.log, self.actor, self.conn),
-        self.scenario_ids["/adduser"]: AdduserScenarioExecutor(self.log, self.actor, self.conn),
+        self.scenario_ids["/answer"]: AnswerScenarioExecutor(self.log, self.actor, self.conn, self.config),
+        self.scenario_ids["/adduser"]: AdduserScenarioExecutor(self.log, self.actor, self.conn, self.config),
     }
     # yapf: enable
     await self.actor.set_commands(

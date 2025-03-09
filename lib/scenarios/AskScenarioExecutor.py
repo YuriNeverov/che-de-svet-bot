@@ -1,3 +1,4 @@
+from lib.Config import Config
 from lib.Domain import Button, Panel
 from lib.Function import AsyncWithContext
 from .ScenarioExecutorInterface import ScenarioExecutorInterface
@@ -5,22 +6,51 @@ from .ScenarioExecutorInterface import ScenarioExecutorInterface
 import json
 
 from sqlite3 import Connection
+from datetime import timedelta, timezone
 
 from lib.ActorInterface import ActorInterface
 from lib.Log import Log
-from db.DAO import fetch_operators, get_user_scenario, insert_message_to_operator, update_user_scenario, update_user_scenario_state
+from db.DAO import *
 from db.Domain import Message, MessageToOperator, Operator, User, UserScenario
 
 
 class AskScenarioExecutor(ScenarioExecutorInterface):
-  def __init__(self, log: Log, actor: ActorInterface, conn: Connection):
-    super().__init__(log, actor, conn)
+  def __init__(self, log: Log, actor: ActorInterface, conn: Connection,
+               config: Config):
+    super().__init__(log, actor, conn, config)
+
+  def get_closest_date(self, user: User):
+    res = datetime.now(timezone.utc)
+    vars = self.config.read_vars()
+    max_msgs = 3
+    if "max-messages-to-operator" in vars:
+      try:
+        max_msgs = int(vars["max-messages-to-operator"])
+      except ValueError:
+        pass
+    last_n_messages = fetch_messages_to_operator_from_user_ordered(
+        self.conn, user.id, max_msgs)
+    if len(last_n_messages) < max_msgs:
+      return res
+    return last_n_messages[-1].sent_datetime + timedelta(days=7)
 
   async def execute(self, user: User, msg: Message):
     scenario = get_user_scenario(self.conn, user.id)
     if not scenario:
       update_user_scenario(self.conn, UserScenario(user.id, 0, "{}"))
       return
+    if not get_user_subscription(self.conn, user.id, 1):
+      update_user_scenario(self.conn, UserScenario(user.id, 0, "{}"))
+      await self.actor.send_text(user.id, f"У вас нет подписки.")
+      return
+    closest_date = self.get_closest_date(user)
+    if datetime.now(timezone.utc) < closest_date:
+      update_user_scenario(self.conn, UserScenario(user.id, 0, "{}"))
+      await self.actor.send_text(
+          user.id,
+          f"Лимит сообщений в неделю достигнут. Попробуйте {closest_date}.")
+      return
+
     self.log.debug(f"In /ask scenario: state: '{scenario.state}'")
 
     state = json.loads(scenario.state)
