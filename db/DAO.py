@@ -127,6 +127,15 @@ def get_product(conn: Connection, product_id: int) -> Optional[Product]:
   return Product(row[0], row[1])
 
 
+def fetch_products_by_subscription(conn: Connection,
+                                   subscription_id: int) -> List[Product]:
+  cursor = conn.cursor()
+  cursor.execute(
+      "select * from products p inner join product_subscriptions ps on ps.product_id = p.id where ps.subscription_id=?",
+      (subscription_id, ))
+  return [Product(row[0], row[1]) for row in cursor.fetchall()]
+
+
 def insert_product(conn: Connection, product: Product) -> Optional[int]:
   cursor = conn.cursor()
   cursor.execute("insert into products (data) values (?)", (product.data, ))

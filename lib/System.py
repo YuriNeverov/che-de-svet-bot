@@ -9,6 +9,7 @@ from .Config import Config
 from .Timer import TimerRegistry
 from .Log import Log
 from .Domain import *
+from .scenarios.ListproductsScenarioExecutor import ListproductsScenarioExecutor
 from .scenarios.ScenarioExecutorInterface import ScenarioExecutorInterface
 from .scenarios.CheckReadyScenarioExecutor import CheckReadyScenarioExecutor
 from .scenarios.ScheduleScenarioExecutor import ScheduleScenarioExecutor
@@ -17,6 +18,7 @@ from .scenarios.AnswerScenarioExecutor import AnswerScenarioExecutor
 from .scenarios.AdduserScenarioExecutor import AdduserScenarioExecutor
 from .scenarios.AddproductScenarioExecutor import AddproductScenarioExecutor
 from .scenarios.SubscribeScenarioExecutor import SubscribeScenarioExecutor
+from .scenarios.GetproductScenarioExecutor import GetproductScenarioExecutor
 
 from db.DAO import *
 from db.Domain import *
@@ -117,8 +119,10 @@ class System:
     await self.actor.set_commands(
         CommandSet([
             Command("answer", "Answer the user's message"),
-            Command("adduser", "Add a user to subscription list"),
+            Command("adduser", "<S> Add a user S to subscription list"),
             Command("addproduct", "Add a product"),
+            Command("listproducts", "List all products"),
+            Command("getproduct", "<N> Get product with id N"),
         ],
                    scope=[operator.id]))
 
@@ -133,8 +137,11 @@ class System:
         "/answer": 5,
         "/adduser": 6,
         "/addproduct": 7,
+        "/listproducts": 8,
+        "/getproduct": 9,
     }
-    self.operator_commands = set(["/answer", "/adduser", "/addproduct"])
+    self.operator_commands = set(
+        ["/answer", "/adduser", "/addproduct", "/listproducts", "/getproduct"])
     self.check_ready_executor = CheckReadyScenarioExecutor(
         self.log, self.actor, self.conn, self.config)
     # yapf: disable
@@ -146,6 +153,8 @@ class System:
         self.scenario_ids["/answer"]: AnswerScenarioExecutor(self.log, self.actor, self.conn, self.config),
         self.scenario_ids["/adduser"]: AdduserScenarioExecutor(self.log, self.actor, self.conn, self.config),
         self.scenario_ids["/addproduct"]: AddproductScenarioExecutor(self.log, self.actor, self.conn, self.config),
+        self.scenario_ids["/listproducts"]: ListproductsScenarioExecutor(self.log, self.actor, self.conn, self.config),
+        self.scenario_ids["/getproduct"]: GetproductScenarioExecutor(self.log, self.actor, self.conn, self.config),
     }
     # yapf: enable
     await self.actor.set_commands(
