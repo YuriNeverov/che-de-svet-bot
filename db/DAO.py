@@ -129,7 +129,7 @@ def get_product(conn: Connection, product_id: int) -> Optional[Product]:
 
 def insert_product(conn: Connection, product: Product) -> Optional[int]:
   cursor = conn.cursor()
-  cursor.execute("insert into products (data) values (?)", (product.data))
+  cursor.execute("insert into products (data) values (?)", (product.data, ))
   conn.commit()
   if cursor.lastrowid is None:
     return None

@@ -15,6 +15,7 @@ from .scenarios.ScheduleScenarioExecutor import ScheduleScenarioExecutor
 from .scenarios.AskScenarioExecutor import AskScenarioExecutor
 from .scenarios.AnswerScenarioExecutor import AnswerScenarioExecutor
 from .scenarios.AdduserScenarioExecutor import AdduserScenarioExecutor
+from .scenarios.AddproductScenarioExecutor import AddproductScenarioExecutor
 from .scenarios.SubscribeScenarioExecutor import SubscribeScenarioExecutor
 
 from db.DAO import *
@@ -117,6 +118,7 @@ class System:
         CommandSet([
             Command("answer", "Answer the user's message"),
             Command("adduser", "Add a user to subscription list"),
+            Command("addproduct", "Add a product"),
         ],
                    scope=[operator.id]))
 
@@ -143,6 +145,7 @@ class System:
         self.scenario_ids["check_ready"]: self.check_ready_executor,
         self.scenario_ids["/answer"]: AnswerScenarioExecutor(self.log, self.actor, self.conn, self.config),
         self.scenario_ids["/adduser"]: AdduserScenarioExecutor(self.log, self.actor, self.conn, self.config),
+        self.scenario_ids["/addproduct"]: AddproductScenarioExecutor(self.log, self.actor, self.conn, self.config),
     }
     # yapf: enable
     await self.actor.set_commands(
