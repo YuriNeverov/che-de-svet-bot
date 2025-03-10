@@ -39,7 +39,8 @@ class AskScenarioExecutor(ScenarioExecutorInterface):
     if not scenario:
       update_user_scenario(self.conn, UserScenario(user.id, 0, "{}"))
       return
-    if not get_user_subscription(self.conn, user.id, 1):
+    sub_id = 1
+    if not get_user_subscription(self.conn, user.id, sub_id):
       update_user_scenario(self.conn, UserScenario(user.id, 0, "{}"))
       await self.actor.send_text(user.id, f"У вас нет подписки.")
       return

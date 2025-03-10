@@ -16,7 +16,8 @@ class ListproductsScenarioExecutor(ScenarioExecutorInterface):
     super().__init__(log, actor, conn, config)
 
   async def execute(self, user: User, msg: Message):
-    products = fetch_products_by_subscription(self.conn, 1)
+    sub_id = 1
+    products = fetch_products_by_subscription(self.conn, sub_id)
 
     if not products:
       await self.actor.send_text(user.id, "Нет продуктов для подписки 1")

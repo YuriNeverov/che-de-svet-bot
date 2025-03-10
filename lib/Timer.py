@@ -30,10 +30,7 @@ class Timer:
     count = 0
     while not self._stop_event.is_set() and (self.times == -1
                                              or count < self.times):
-      try:
-        self.func(*self.args, **self.kwargs)
-      except Exception as e:
-        print(f"Exception occurred: {e}")
+      self.func(*self.args, **self.kwargs)
       count += 1
       # TODO: Make true duration sleep (now it doesn't count time of self.func execution)
       time.sleep(self.duration)

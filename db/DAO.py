@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Optional
 from sqlite3 import Connection
 from .Domain import (User, Operator, Subscription, Product,
@@ -173,6 +173,15 @@ def insert_product_user_delivered(conn: Connection, user_id: int,
   return cursor.lastrowid
 
 
+def fetch_user_delivered_product_ids(conn: Connection,
+                                     user_id: int) -> List[int]:
+  cursor = conn.cursor()
+  cursor.execute(
+      "select product_id from product_user_delivered where user_id=?",
+      (user_id, ))
+  return [row[0] for row in cursor.fetchall()]
+
+
 def get_user_subscription(conn: Connection, user_id: int,
                           subscription_id: int) -> Optional[UserSubscription]:
   cursor = conn.cursor()
@@ -259,11 +268,16 @@ def get_schedule(conn: Connection, user_id: int,
   return Schedule(row[0], row[1], datetime.fromisoformat(row[2]), row[3])
 
 
+def delete_schedule(conn: Connection, user_id: int, product_id: int):
+  cursor = conn.cursor()
+  cursor.execute("delete from schedules where user_id=? and product_id=?",
+                 (user_id, product_id))
+  conn.commit()
+
+
 def fetch_active_schedules(conn: Connection) -> List[Schedule]:
   cursor = conn.cursor()
-  cursor.execute(
-      "select * from schedules where elapsed = 0 and delivery_datetime < ?",
-      (datetime.now(timezone.utc), ))
+  cursor.execute("select * from schedules where elapsed = 0")
   return [
       Schedule(row[0], row[1], datetime.fromisoformat(row[2]), row[3])
       for row in cursor.fetchall()

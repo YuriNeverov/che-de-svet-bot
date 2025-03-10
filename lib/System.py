@@ -174,7 +174,7 @@ class System:
           self.conn, Subscription(sub_id, "main", 50000, "Main subscription"))
 
     self.timer_registry.new(
-        "check_ready", 3, 5,
+        "check_ready", -1, 5,
         AsyncWithContext(self.check_ready_executor.check_ready,
                          self.actor.get_event_loop()))
 
