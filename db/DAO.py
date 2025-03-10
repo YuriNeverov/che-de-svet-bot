@@ -268,6 +268,15 @@ def get_schedule(conn: Connection, user_id: int,
   return Schedule(row[0], row[1], datetime.fromisoformat(row[2]), row[3])
 
 
+def get_schedule_by_user(conn: Connection, user_id: int) -> Optional[Schedule]:
+  cursor = conn.cursor()
+  cursor.execute("select * from schedules where user_id=?", (user_id, ))
+  row = cursor.fetchone()
+  if row is None:
+    return None
+  return Schedule(row[0], row[1], datetime.fromisoformat(row[2]), row[3])
+
+
 def delete_schedule(conn: Connection, user_id: int, product_id: int):
   cursor = conn.cursor()
   cursor.execute("delete from schedules where user_id=? and product_id=?",

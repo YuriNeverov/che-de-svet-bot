@@ -1,5 +1,7 @@
 from db.DAO import *
 from lib.Config import Config
+from lib.Domain import Button, Panel
+from lib.Function import AsyncWithContext
 from .ScenarioExecutorInterface import ScenarioExecutorInterface
 
 from sqlite3 import Connection
@@ -20,6 +22,36 @@ class ScheduleScenarioExecutor(ScenarioExecutorInterface):
     if not scenario:
       update_user_scenario(self.conn, UserScenario(user.id, 0, "{}"))
       return
+    if schedule := get_schedule_by_user(self.conn, user.id):
+
+      def choice_yes():
+        async def callback():
+          delete_schedule(self.conn, schedule.user_id, schedule.product_id)
+          state = {"product-id": schedule.product_id}
+          update_user_scenario_state(self.conn, user.id, json.dumps(state))
+          await self.actor.send_text(
+              msg.chat_id,
+              "Введите дату (часовой пояс МСК) в формате ДД.ММ.ГГГГ")
+
+        return AsyncWithContext(callback, self.actor.get_event_loop())
+
+      def choice_no():
+        async def callback():
+          update_user_scenario(self.conn, UserScenario(user.id, 0, "{}"))
+          await self.actor.send_text(msg.chat_id, "Принято.")
+
+        return AsyncWithContext(callback, self.actor.get_event_loop())
+
+      panel = Panel([
+          [Button("Да", choice_yes()),
+           Button("Нет", choice_no())],
+      ])
+      await self.actor.send_panel(
+          user.id,
+          f"Вы уже записаны на {schedule.delivery_datetime.strftime('%d.%m.%y %H:%M')} (часовой пояс МСК). Вы хотите перезаписаться?",
+          panel)
+      return
+
     sub_id = 1
     if not get_user_subscription(self.conn, user.id, sub_id):
       update_user_scenario(self.conn, UserScenario(user.id, 0, "{}"))
